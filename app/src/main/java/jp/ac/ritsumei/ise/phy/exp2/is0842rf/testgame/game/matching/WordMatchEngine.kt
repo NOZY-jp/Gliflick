@@ -20,6 +20,8 @@ data class WordInputPreview(
 class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode = InputMode.KANA) {
     private var matchers = definitions.map { WordMatcher(it, initialMode) }.toMutableList()
     private var nextPosition = 0L
+    private var rememberedMode = initialMode
+    private var lastProcessedPosition = -1L
     private var trialStart: Long? = null
     private data class DisplayInput(val position: Long, val displayStart: Long, val text: String)
     private var displayInput = mutableListOf<DisplayInput>()
@@ -36,10 +38,9 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
         private set
     var receivedText = ""
         private set
-    val inputMode: InputMode get() = matchers.first().inputMode
+    val inputMode: InputMode get() = matchers.firstOrNull()?.inputMode ?: rememberedMode
 
     init {
-        require(matchers.isNotEmpty()) { "At least one word is required." }
         require(definitions.map { it.id }.toSet().size == definitions.size) { "Word ids must be unique." }
     }
 
@@ -52,7 +53,7 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
         val presentation = when (token) {
             is InputToken.Stroke -> DisplayInput(position, position, token.value)
             is InputToken.KanaObservation -> {
-                val language = TypingLanguages.forTag(matchers.first().definition.languageTag)
+                val language = TypingLanguages.forTag(matchers.firstOrNull()?.definition?.languageTag ?: "ja")
                 val confirmed = RomanObservationGraph(language, token).confirmedSpelling()
                 DisplayInput(position, position + if (confirmed == null) token.observedRomanPrefix.length else 0,
                     confirmed ?: token.kana)
@@ -64,15 +65,24 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
             matcher.acceptAt(token, position, allowPendingKanaModifier)
             matcher.lastSteps.forEach { step -> byPosition.getOrPut(step.position) { mutableListOf() } += matcher to step }
         }
+        rememberedMode = matchers.firstOrNull()?.inputMode ?: when (token) {
+            is InputToken.KanaObservation -> InputMode.ROMAJI
+            is InputToken.Stroke -> when {
+                token.value.any { it.lowercaseChar() in 'a'..'z' } -> InputMode.ROMAJI
+                token.value.any { it in 'ぁ'..'ゖ' || it == 'ー' } -> InputMode.KANA
+                else -> rememberedMode
+            }
+        }
         val completed = linkedSetOf<WordDefinition>()
         if (byPosition.isEmpty()) {
             // An unexplained observation cannot silently count as a valid stroke.
             byPosition[position] = mutableListOf()
         }
+        lastProcessedPosition = byPosition.lastKey()
         byPosition.forEach { (at, evaluations) ->
             val starts = evaluations.flatMap { it.second.acceptedStarts }.toSet()
             // Several words can recognize the same newly typed kana. Count it once.
-            val kanaGain = evaluations.maxOfOrNull { (matcher, step) ->
+            val kanaGain = evaluations.filterNot { it.first.isRetired }.maxOfOrNull { (matcher, step) ->
                 val previous = confirmedKana[matcher.definition.id].orEmpty()
                 val gain = step.kanaProgress.maxOfOrNull { (start, count) ->
                     (count - (previous[start] ?: 0)).coerceAtLeast(0)
@@ -90,7 +100,9 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
             if (trialStart != null && hits.any { (_, step) -> step.completedStarts.any { it <= trialStart!! } })
                 trialStart = null
             val newWords = hits.map { it.first.definition }.filter { it !in completed }.distinct()
-            val spans = newWords.map { word ->
+            val scoringIds = hits.filterNot { it.first.isRetired }.map { it.first.definition.id }.toSet()
+            val scoringWords = newWords.filter { it.id in scoringIds }
+            val spans = scoringWords.map { word ->
                 CompletionSpan(word, hits.filter { it.first.definition.id == word.id }
                     .flatMap { it.second.completedStarts }.min(), at)
             }
@@ -98,8 +110,8 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
                 val earlier = recentCompletions.filter { old ->
                     spans.any { current -> current.start <= old.end && old.start <= current.end }
                 }.map { it.word }.distinctBy { it.id }
-                if (newWords.size > 1 || earlier.isNotEmpty())
-                    overlapEvents += OverlapEvent(newWords, earlier)
+                if (scoringWords.size > 1 || earlier.isNotEmpty())
+                    overlapEvents += OverlapEvent(scoringWords, earlier)
                 recentCompletions += spans
             }
             completed += newWords
@@ -125,6 +137,7 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
     private fun fork(): WordMatchEngine = WordMatchEngine(matchers.map { it.definition }, inputMode).also {
         it.matchers = matchers.map { matcher -> matcher.fork() }.toMutableList()
         it.nextPosition = nextPosition
+        it.lastProcessedPosition = lastProcessedPosition
         it.trialStart = trialStart
         it.streak = streak
         it.mistypeCount = mistypeCount
@@ -147,6 +160,38 @@ class WordMatchEngine(definitions: List<WordDefinition>, initialMode: InputMode 
         previewTokens(characters.map { InputToken.Stroke(it) })
     fun previewTokens(tokens: List<InputToken>): List<WordMatchState> = previewInput(tokens).words
     fun snapshot(): List<WordMatchState> = matchers.map { it.snapshot() }
+
+    fun completedSnapshot(id: String): WordMatchState? =
+        matchers.firstOrNull { it.definition.id == id }?.completedSnapshot()
+
+    fun addWord(definition: WordDefinition, pendingTokens: List<InputToken> = emptyList()) {
+        require(matchers.none { it.definition.id == definition.id }) { "Word ids must be unique." }
+        val from = pendingBoundary(pendingTokens)
+        matchers += WordMatcher(definition, inputMode).also { it.startFrom(from) }
+    }
+
+    /** Existing paths, including the current speculative IME segment, may finish; future starts may not. */
+    fun retireWord(id: String, pendingTokens: List<InputToken> = emptyList()) {
+        val through = pendingBoundary(pendingTokens) - 1
+        matchers.firstOrNull { it.definition.id == id }
+            ?.retire(through)
+    }
+
+    private fun pendingBoundary(tokens: List<InputToken>): Long {
+        if (tokens.isEmpty()) return lastProcessedPosition + 1
+        val copy = fork()
+        tokens.forEach { copy.accept(it) }
+        return copy.lastProcessedPosition + 1
+    }
+
+    fun removeWord(id: String) {
+        rememberedMode = inputMode
+        matchers.removeAll { it.definition.id == id }
+        confirmedKana.remove(id)
+        // A target disappearing is not a typing mistake.
+        trialStart = trialStart?.takeIf { start -> matchers.any { word -> word.activeStarts.any { it <= start } } }
+        refreshReceivedText()
+    }
 
     fun replaceWord(id: String, replacement: WordDefinition) {
         val slot = matchers.indexOfFirst { it.definition.id == id }

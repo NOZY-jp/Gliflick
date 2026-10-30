@@ -28,10 +28,12 @@ class TitleMenuInstrumentedTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var title: TitleActivity
     private lateinit var monitor: Instrumentation.ActivityMonitor
+    private lateinit var combatMonitor: Instrumentation.ActivityMonitor
     private var destination: Activity? = null
 
     @Before fun launch() {
         monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
+        combatMonitor = instrumentation.addMonitor(CombatActivity::class.java.name, null, false)
         title = instrumentation.startActivitySync(Intent(instrumentation.targetContext, TitleActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as TitleActivity
         instrumentation.runOnMainSync {
@@ -46,6 +48,7 @@ class TitleMenuInstrumentedTest {
     @After fun finish() {
         instrumentation.runOnMainSync { destination?.finish(); title.finish() }
         instrumentation.removeMonitor(monitor)
+        instrumentation.removeMonitor(combatMonitor)
     }
 
     @Test fun normalAndPlCompositionMatchTheFigmaStates() {
@@ -219,11 +222,16 @@ class TitleMenuInstrumentedTest {
     }
 
     private fun assertDestination(command: String) {
-        destination = instrumentation.waitForMonitorWithTimeout(monitor, 5000)
+        destination = instrumentation.waitForMonitorWithTimeout(if (command == "play") combatMonitor else monitor, 5000)
         assertNotNull("$command should navigate after its animation", destination)
         instrumentation.runOnMainSync {
-            assertEquals(command, destination!!.intent.getStringExtra(MainActivity.EXTRA_MENU_COMMAND))
-            assertEquals("$command → 入力テスト", destination!!.findViewById<TextView>(R.id.inputTitle).text.toString())
+            if (command == "play") {
+                assertTrue(destination is CombatActivity)
+                assertNotNull(destination!!.findViewById<CombatView>(R.id.combatArena))
+            } else {
+                assertEquals(command, destination!!.intent.getStringExtra(MainActivity.EXTRA_MENU_COMMAND))
+                assertEquals("$command → 入力テスト", destination!!.findViewById<TextView>(R.id.inputTitle).text.toString())
+            }
         }
     }
 
@@ -232,7 +240,10 @@ class TitleMenuInstrumentedTest {
         destination = null
         waitUntil { title.hasWindowFocus() && title.findViewById<AppCompatEditText>(R.id.menuInputHost).hasFocus() }
         // waitForMonitorWithTimeout consumes the monitor; register a fresh one for the next launch.
+        instrumentation.removeMonitor(monitor)
+        instrumentation.removeMonitor(combatMonitor)
         monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
+        combatMonitor = instrumentation.addMonitor(CombatActivity::class.java.name, null, false)
     }
 
     private fun highlightedLetters(id: Int): Int {

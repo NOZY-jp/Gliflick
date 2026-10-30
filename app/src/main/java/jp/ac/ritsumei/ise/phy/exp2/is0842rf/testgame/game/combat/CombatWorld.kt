@@ -1,0 +1,171 @@
+package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat
+
+import kotlin.random.Random
+
+data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExperience: Int = 50,
+                                 val experienceIncreasePerLevel: Int = 20) {
+    init { require(killExperience >= 0 && firstLevelExperience > 0 && experienceIncreasePerLevel >= 0) }
+}
+data class CombatConfig(val initialEnemies: Int = 6, val maxEnemies: Int = 8, val spawnInterval: Float = 2.8f,
+                        val playerMaxHp: Int = 300, val progression: ProgressionDefinition = ProgressionDefinition()) {
+    init { require(initialEnemies in 0..maxEnemies && spawnInterval > 0f && playerMaxHp > 0) }
+}
+
+fun interface EnemySpawnPolicy {
+    fun choose(elapsedSeconds: Double, playerLevel: Int): EnemyDefinition
+}
+class FixedEnemySpawnPolicy(private val definition: EnemyDefinition = EnemyDefinition()) : EnemySpawnPolicy {
+    override fun choose(elapsedSeconds: Double, playerLevel: Int) = definition
+}
+
+sealed interface CombatEvent {
+    data class Spawned(val enemy: Enemy) : CombatEvent
+    data class Died(val enemyId: Long, val position: Vec2) : CombatEvent
+}
+
+/** Single-threaded domain simulation. Rendering and keyboard transport do not live here. */
+class CombatWorld(
+    val config: CombatConfig = CombatConfig(),
+    private val random: Random = Random.Default,
+    private val spawnPolicy: EnemySpawnPolicy = FixedEnemySpawnPolicy(),
+    val mainWeapon: MainWeapon = Repeater()
+) {
+    val player = Player(config.playerMaxHp)
+    private val mutableEnemies = mutableListOf<Enemy>()
+    private val mutableProjectiles = mutableListOf<Projectile>()
+    private val mutableBursts = mutableListOf<DeathBurst>()
+    val enemies: List<Enemy> get() = mutableEnemies
+    val projectiles: List<Projectile> get() = mutableProjectiles
+    val deathBursts: List<DeathBurst> get() = mutableBursts
+    private val events = mutableListOf<CombatEvent>()
+    private var nextEnemyId = 1L
+    private var spawnClock = 0f
+    var width = 0f; private set
+    var height = 0f; private set
+    var elapsedSeconds = 0.0; private set
+    var level = 1; private set
+    var experience = 0; private set
+    var kills = 0; private set
+    val nextLevelExperience get() = config.progression.firstLevelExperience +
+        (level - 1) * config.progression.experienceIncreasePerLevel
+    val experienceFraction get() = experience.toFloat() / nextLevelExperience
+    val isGameOver get() = player.hp == 0
+
+    fun resize(newWidth: Float, newHeight: Float) {
+        if (newWidth <= 0f || newHeight <= 0f) return
+        val first = width == 0f
+        if (!first) {
+            val sx = newWidth / width
+            val sy = newHeight / height
+            mutableEnemies.forEach { it.position = it.position.scaled(sx, sy); it.previousPosition = it.position }
+            mutableProjectiles.forEach {
+                it.position = it.position.scaled(sx, sy)
+                it.previousPosition = it.position
+                it.velocity = it.velocity.scaled(sx, sy).normalized() * it.velocity.length()
+            }
+            mutableBursts.forEach { it.origin = it.origin.scaled(sx, sy) }
+            mainWeapon.resize(sx, sy)
+        }
+        width = newWidth
+        height = newHeight
+        player.position = Vec2(width / 2f, height / 2f)
+        if (first) repeat(config.initialEnemies) { spawnEnemy(spawnPosition()) }
+    }
+
+    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level)): Enemy =
+        Enemy(nextEnemyId++, definition, position).also {
+        mutableEnemies += it
+        events += CombatEvent.Spawned(it)
+    }
+
+    fun target(enemyId: Long) {
+        mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let { mainWeapon.target(it.id, it.position) }
+    }
+
+    fun damageEnemy(enemyId: Long, damage: Int) {
+        mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
+            it.takeDamage(damage)
+            if (!it.isAlive) die(it, awardExperience = true)
+        }
+    }
+
+    fun drainEvents(): List<CombatEvent> = events.toList().also { events.clear() }
+
+    fun update(dt: Float) {
+        require(dt >= 0f && dt.isFinite())
+        if (width == 0f) return
+        mutableBursts.forEach { it.advance(dt) }
+        mutableBursts.removeAll { it.isFinished }
+        mutableEnemies.forEach { enemy -> enemy.deathAge?.let { enemy.deathAge = it + dt } }
+        mutableEnemies.removeAll { (it.deathAge ?: 0f) >= DEATH_FADE_SECONDS }
+        if (isGameOver) return
+        elapsedSeconds += dt
+        mutableEnemies.filter { it.isAlive }.forEach { enemy ->
+            enemy.advance(dt, player.position)
+            if ((enemy.position - player.position).length() <= enemy.definition.radius + player.radius) {
+                player.takeDamage(enemy.definition.contactDamage)
+                die(enemy, awardExperience = false)
+            }
+        }
+        val actions = mainWeapon.update(dt, player.position) { id ->
+            mutableEnemies.firstOrNull { it.id == id && it.isAlive }?.position
+        }
+        actions.forEach { action -> when (action) {
+            is WeaponAction.LaunchProjectile -> mutableProjectiles += action.projectile
+        } }
+        val spent = mutableSetOf<Projectile>()
+        mutableProjectiles.forEach { projectile ->
+            projectile.advance(dt)
+            val hit = mutableEnemies.asSequence().filter { it.isAlive }.mapNotNull { enemy ->
+                sweptCircleHit(projectile.previousPosition - enemy.previousPosition,
+                    projectile.position - enemy.position, projectile.radius + enemy.definition.radius)
+                    ?.let { enemy to it }
+            }.minByOrNull { it.second }
+            if (hit != null) {
+                projectile.position = projectile.previousPosition +
+                    (projectile.position - projectile.previousPosition) * hit.second
+                hit.first.takeDamage(projectile.damage)
+                if (!hit.first.isAlive) die(hit.first, awardExperience = true)
+                spent += projectile
+            } else if (projectile.position.x !in -32f..width + 32f ||
+                projectile.position.y !in -32f..height + 32f) spent += projectile
+        }
+        mutableProjectiles.removeAll(spent)
+        spawnClock += dt
+        if (spawnClock >= config.spawnInterval) {
+            spawnClock %= config.spawnInterval
+            if (mutableEnemies.count { it.isAlive } < config.maxEnemies) spawnEnemy(spawnPosition())
+        }
+    }
+
+    private fun die(enemy: Enemy, awardExperience: Boolean) {
+        if (enemy.deathAge != null) return
+        enemy.takeDamage(Int.MAX_VALUE)
+        enemy.deathAge = 0f
+        mainWeapon.targetDied(enemy.id, enemy.position)
+        mutableBursts += DeathBurst(enemy.position, random)
+        events += CombatEvent.Died(enemy.id, enemy.position)
+        if (awardExperience) {
+            kills++
+            experience += config.progression.killExperience
+            while (experience >= nextLevelExperience) { experience -= nextLevelExperience; level++ }
+        }
+    }
+
+    private fun spawnPosition(): Vec2 {
+        val top = 124f.coerceAtMost(height * 0.36f)
+        fun candidate(): Vec2 = when (random.nextInt(4)) {
+            0 -> Vec2(28f + random.nextFloat() * (width - 56f).coerceAtLeast(1f), top)
+            1 -> Vec2(width - 24f, top + random.nextFloat() * (height - top - 24f).coerceAtLeast(1f))
+            2 -> Vec2(28f + random.nextFloat() * (width - 56f).coerceAtLeast(1f), height - 24f)
+            else -> Vec2(24f, top + random.nextFloat() * (height - top - 24f).coerceAtLeast(1f))
+        }
+        // Prefer clear perimeter slots so the first wave's labels remain readable.
+        return List(32) { candidate() }.maxBy { point ->
+            minOf((point - player.position).length(),
+                mutableEnemies.filter { it.isAlive }.minOfOrNull { (point - it.position).length() } ?: Float.MAX_VALUE)
+        }
+    }
+
+    companion object { const val DEATH_FADE_SECONDS = 0.14f }
+}

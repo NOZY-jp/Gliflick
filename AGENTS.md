@@ -12,6 +12,13 @@
 - Tapping a menu command simulates one character every 50ms. Keep the four menu rows aligned at the Figma left edge and use their text lengths to form the rising/falling right edge.
 - Menu and gameplay share GameImeEditText and WordMatchEngine; menus only adapt static targets/navigation, and English belongs in TypingLanguage. Do not add a separate correctness algorithm or discard a failing character before considering it as a fresh word start. Keep armorarmory and continuously highlighted aaaaa in regression coverage. Instrumented notification replay is not human keyboard evidence.
 
+## Play scene
+
+- Read docs/EndlessCombatDesign.md before extending combat. Fixed definitions, per-enemy EnemyBehavior/Durability, MainWeapon implementations, and EnemySpawnPolicy are separate extension points. CombatWorld stays free of Android views and keyboard transport; CombatRenderer never decides matching, damage or spawning.
+- Completing a word queues an attack and replaces that caption; only HP depletion counts as a combat kill. The shared WordMatchEngine remains the correctness boundary.
+- A dead enemy's partially typed caption may only continue its already observed input, including pending IME composition. It cannot begin fresh matches, fire, earn new reading streak or overlap rewards. Removing/spawning an enemy must not fabricate a mistype or replay old input into a new target.
+- Every projectile freezes its own direction at emission and uses earliest swept collision, including non-target enemies. A queued burst survives target death and fires remaining shots toward the last known point.
+
 ## Version control
 
 - This checkout is a colocated Git/Jujutsu repository. Use jj status/diff to review and jj describe/new to preserve completed changes; keep the local main bookmark current.

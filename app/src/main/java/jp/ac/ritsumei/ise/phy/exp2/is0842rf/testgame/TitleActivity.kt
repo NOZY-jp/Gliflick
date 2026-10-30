@@ -189,7 +189,8 @@ class TitleActivity : AppCompatActivity() {
     }
 
     private fun navigate(command: MenuCommand) {
-        startActivity(Intent(this, MainActivity::class.java)
+        val destination = if (command == MenuCommand.PLAY) CombatActivity::class.java else MainActivity::class.java
+        startActivity(Intent(this, destination)
             .putExtra(MainActivity.EXTRA_MENU_COMMAND, command.text))
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)

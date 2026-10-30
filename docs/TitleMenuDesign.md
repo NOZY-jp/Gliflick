@@ -23,7 +23,7 @@
 - On a tap, complete the command one character every 50ms (twice the former 100ms interval). If the same command already has a prefix, continue from that prefix; tapping another command starts at its beginning.
 - A completed typed command and a completed simulated command share a 420ms AccelerateDecelerate animation: the selected word keeps its own centre fixed, scales from 1× to 2×, and fades from 100% to 0% opacity. Other title content fades out, then the input-test screen opens.
 - During that same completion phase the circle pair and square pair expand around their own centres and fade out. Their final scale is calculated from the viewport so both pairs move fully offscreen, including on tall displays. The target, navigation, and Warder marks fade with the outlines; the grid stays still and opaque. Cancelling/returning resets the shape progress.
-- All four commands currently open the existing input-test activity, displaying `<command> → 入力テスト`.
+- `play` opens Repeater endless combat immediately, without mode selection. The other three commands currently open the existing input-test activity, displaying `<command> → 入力テスト`.
 - `Launch IME` is visible only while the system keyboard is hidden. Tapping it focuses the shared input field and requests the keyboard. Selection locks until navigation. Repeated taps and incoming input during the animation do not trigger additional navigation. Pausing cancels delayed work and the animation; returning from the input-test screen resets the title menu.
 - System-disabled animations bypass the tap animation, respecting the Android animation setting.
 

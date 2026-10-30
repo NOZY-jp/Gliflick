@@ -1,0 +1,5 @@
+jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.CombatInstrumentedTest:.
+
+Time: 2.707
+
+OK (1 test)

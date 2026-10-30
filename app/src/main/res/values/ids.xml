@@ -1,4 +1,6 @@
 <resources>
+    <item name="combatArena" type="id" />
+    <item name="combatInputHost" type="id" />
     <item name="menuInputHost" type="id" />
     <item name="menuContent" type="id" />
     <item name="menuPlay" type="id" />

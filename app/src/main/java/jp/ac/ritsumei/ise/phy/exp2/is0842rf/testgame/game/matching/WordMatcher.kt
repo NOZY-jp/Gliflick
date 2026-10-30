@@ -37,6 +37,11 @@ class WordMatcher(
     private val edges = reading.indices.map { language.romanEdges(reading, it) }
     private var paths = emptyList<Path>()
     private var nextPosition = 0L
+    private var newStartsThrough = Long.MAX_VALUE
+    private var newStartsFrom = Long.MIN_VALUE
+    private var completedInputText: String? = null
+    internal var isRetired = false
+        private set
 
     internal var lastSteps: List<MatchStep> = emptyList()
         private set
@@ -78,7 +83,7 @@ class WordMatcher(
         if (latin) inputMode = InputMode.ROMAJI
         else if (normalized.any { it in 'ぁ'..'ゖ' || it == 'ー' }) inputMode = InputMode.KANA
 
-        val candidates = paths + Path(start = position)
+        val candidates = paths + freshStart(position)
         val pending = if (allowPendingKanaModifier && !latin) {
             candidates.filter { path ->
                 reading.getOrNull(path.offset)?.let { language.canModifyKana(normalized, it) } == true
@@ -94,6 +99,9 @@ class WordMatcher(
         }
         val next = (advanced + pending).distinct()
         val completed = next.filter { it.offset == reading.size }.map { it.start }.toSet()
+        next.firstOrNull { it.offset == reading.size }?.let {
+            completedInputText = if (latin) it.romanHistory else reading.joinToString("")
+        }
         paths = next.filter { it.offset != reading.size }
         return MatchStep(position, next.map { it.start }.toSet(), completed, confirmedKana(next))
     }
@@ -104,7 +112,24 @@ class WordMatcher(
         it.paths = paths
         it.isCompleted = isCompleted
         it.nextPosition = nextPosition
+        it.newStartsThrough = newStartsThrough
+        it.newStartsFrom = newStartsFrom
+        it.completedInputText = completedInputText
+        it.isRetired = isRetired
     }
+
+    internal fun retire(throughPosition: Long) {
+        newStartsThrough = minOf(newStartsThrough, throughPosition)
+        isRetired = true
+    }
+    internal fun startFrom(position: Long) { newStartsFrom = position }
+
+    internal fun completedSnapshot(): WordMatchState? = completedInputText?.let {
+        WordMatchState(definition, reading.size, true, it, splitTextCharacters(it).size)
+    }
+
+    private fun freshStart(position: Long): List<Path> =
+        if (position in newStartsFrom..newStartsThrough) listOf(Path(start = position)) else emptyList()
 
     fun snapshot(): WordMatchState {
         val path = bestPath()
@@ -126,7 +151,8 @@ class WordMatcher(
     }
 
     private fun acceptObservation(observation: InputToken.KanaObservation, position: Long): List<MatchStep> {
-        data class State(val paths: List<Path>, val progress: RomanObservationGraph.Progress, val steps: List<MatchStep>)
+        data class State(val paths: List<Path>, val progress: RomanObservationGraph.Progress,
+                         val steps: List<MatchStep>, val completedPrompt: String? = null)
         data class Key(val progress: RomanObservationGraph.Progress, val paths: Set<Path>,
                        val completions: Set<Pair<Long, Long>>)
         val graph = RomanObservationGraph(language, observation)
@@ -145,15 +171,17 @@ class WordMatcher(
                     val progress = graph.advance(state.progress, edge.spelling) ?: continue
                     var branch = state.paths
                     val steps = state.steps.toMutableList()
+                    var completedPrompt = state.completedPrompt
                     var symbol = state.progress.prefixMatched + if (state.progress.terminalUsed) 1 else 0
                     for (character in edge.spelling) {
                         val at = position + symbol++
                         val next = advanceRoman(branch, character.toString(), at)
                         val completed = next.filter { it.offset == reading.size }.map { it.start }.toSet()
+                        next.firstOrNull { it.offset == reading.size }?.let { completedPrompt = it.romanHistory }
                         steps += MatchStep(at, next.map { it.start }.toSet(), completed, confirmedKana(next))
                         branch = next.filter { it.offset != reading.size }
                     }
-                    enqueue(edge.end, State(branch, progress, steps))
+                    enqueue(edge.end, State(branch, progress, steps, completedPrompt))
                 }
             }
         }
@@ -165,12 +193,13 @@ class WordMatcher(
             return fallback.mapIndexed { index, text -> acceptCharacter(text, position + index, false) }
         }
         paths = compatible.flatMap { it.paths }.distinctBy { it.copy(romanHistory = "") }
+        compatible.firstNotNullOfOrNull { it.completedPrompt }?.let { completedInputText = it }
         inputMode = InputMode.ROMAJI
         return mergeMatchSteps(compatible.flatMap { it.steps })
     }
 
     private fun advanceRoman(current: List<Path>, character: String, position: Long): List<Path> =
-        (current + Path(start = position)).flatMap { path ->
+        (current + freshStart(position)).flatMap { path ->
             val possible = path.edge?.let(::listOf) ?: edges.getOrElse(path.offset) { emptyList() }
             possible.mapNotNull { edge ->
                 if (edge.spelling.getOrNull(path.edgeProgress)?.toString() != character) null

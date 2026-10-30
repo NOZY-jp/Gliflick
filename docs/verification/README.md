@@ -1,5 +1,9 @@
 # IME入力の検証記録
 
+## プレイ画面・戦闘
+
+通常ドローン、Repeater、HUD、動的な文字寿命の実装結果は [combat-20261030.md](combat-20261030.md)。単体95件、実機全体22件、最終変更後の戦闘3件が成功。公開パラメーターの出典と拡張箇所は [EndlessCombatDesign.md](../EndlessCombatDesign.md)。
+
 ## 2026-10-26: 成功した確認
 
 - Debug APK build: 成功。
