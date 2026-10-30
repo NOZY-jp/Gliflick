@@ -215,7 +215,7 @@ class CombatRenderer(context: Context) {
         paint.textSize = 10.5f
         val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
-        val centerY = anchor.y + if (placeBelowEnemy) 22f else -22f
+        val centerY = anchor.y + if (placeBelowEnemy) 30f else -22f
         canvas.save()
         canvas.scale(scale, scale, centerX, centerY)
         paint.textSize = wordTextSize
