@@ -23,6 +23,17 @@ enum class EnemyShape(val sides: Int) {
     CIRCLE(0), TRIANGLE(3), SQUARE(4), PENTAGON(5), HEXAGON(6), HEPTAGON(7), OCTAGON(8)
 }
 
+/** Circular Drone marks reproduced from the official Wiki's seven tier images. */
+enum class EnemyMarkerPattern {
+    DOT,
+    RINGED_DOT,
+    DOUBLE_RINGED_DOT,
+    BULLSEYE,
+    CENTER_HOLE,
+    SEGMENTED_CENTER_HOLE,
+    RINGED_SEGMENTED_CENTER_HOLE
+}
+
 /** Reusable stat modifier attached to an individual enemy definition. */
 data class EnemyMutation(
     val id: String,
@@ -53,6 +64,7 @@ data class EnemyDefinition(
     val kind: EnemyKind = EnemyKind.DRONE,
     val variant: EnemyVariant = EnemyVariant.NORMAL,
     val shape: EnemyShape = EnemyShape.CIRCLE,
+    val markerPattern: EnemyMarkerPattern = EnemyMarkerPattern.DOT,
     val maxHp: Int = 80,
     val speed: Float = 5.95f,
     val contactDamage: Int = 40,

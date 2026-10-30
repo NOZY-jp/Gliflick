@@ -4,14 +4,17 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.CombatSession
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.CombatWorld
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.Enemy
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.EnemyMarkerPattern
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.HitFeedback
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.Vec2
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.EnemyShape
@@ -32,6 +35,7 @@ class CombatRenderer(context: Context) {
     private val muted = Color.rgb(151, 151, 143)
     private val red = Color.rgb(170, 91, 100)
     private val light = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    private val enemyMarkerPaths = EnemyMarkerPattern.entries.associateWith(::createEnemyMarkerPath)
     private var background: Shader? = null
     private var backgroundWidth = 0f
     private var backgroundHeight = 0f
@@ -144,8 +148,13 @@ class CombatRenderer(context: Context) {
         val centerX = enemy.position.x
         val centerY = enemy.position.y
         val radius = enemy.radius
+        paint.style = Paint.Style.FILL
         if (enemy.definition.shape == EnemyShape.CIRCLE) {
-            canvas.drawCircle(centerX, centerY, radius, paint)
+            canvas.save()
+            canvas.translate(centerX, centerY)
+            canvas.scale(radius, radius)
+            canvas.drawPath(enemyMarkerPaths.getValue(enemy.definition.markerPattern), paint)
+            canvas.restore()
             return
         }
         val path = Path()
@@ -157,6 +166,58 @@ class CombatRenderer(context: Context) {
         }
         path.close()
         canvas.drawPath(path, paint)
+        canvas.save()
+        canvas.translate(centerX, centerY)
+        canvas.scale(radius * 0.32f, radius * 0.32f)
+        canvas.drawPath(enemyMarkerPaths.getValue(enemy.definition.markerPattern), paint)
+        canvas.restore()
+    }
+
+    private fun createEnemyMarkerPath(pattern: EnemyMarkerPattern): Path {
+        val path = Path().apply { fillType = Path.FillType.EVEN_ODD }
+        fun circle(radius: Float) = path.addCircle(0f, 0f, radius, Path.Direction.CW)
+        fun notchedDisk(radius: Float, centerHole: Float, notchOrbit: Float, notchWidth: Float,
+                        notchHeight: Float, notchCount: Int = 6) {
+            circle(radius)
+            circle(centerHole)
+            val notch = Path().apply {
+                addRoundRect(RectF(-notchWidth / 2f, -notchOrbit - notchHeight / 2f,
+                    notchWidth / 2f, -notchOrbit + notchHeight / 2f),
+                    notchHeight / 2f, notchHeight / 2f, Path.Direction.CW)
+            }
+            repeat(notchCount) { index ->
+                val rotated = Path()
+                val rotation = Matrix().apply { setRotate(index * 360f / notchCount) }
+                notch.transform(rotation, rotated)
+                path.addPath(rotated)
+            }
+        }
+
+        when (pattern) {
+            EnemyMarkerPattern.DOT -> circle(1f)
+            EnemyMarkerPattern.RINGED_DOT -> {
+                circle(1f); circle(0.82f); circle(0.31f)
+            }
+            EnemyMarkerPattern.DOUBLE_RINGED_DOT -> {
+                circle(1f); circle(0.86f); circle(0.70f); circle(0.56f); circle(0.30f)
+            }
+            EnemyMarkerPattern.BULLSEYE -> {
+                circle(1f); circle(0.62f); circle(0.31f)
+            }
+            EnemyMarkerPattern.CENTER_HOLE -> {
+                circle(1f); circle(0.15f)
+            }
+            EnemyMarkerPattern.SEGMENTED_CENTER_HOLE -> notchedDisk(
+                radius = 1f, centerHole = 0.16f, notchOrbit = 0.67f,
+                notchWidth = 0.25f, notchHeight = 0.085f
+            )
+            EnemyMarkerPattern.RINGED_SEGMENTED_CENTER_HOLE -> {
+                circle(1f); circle(0.93f); circle(0.82f); circle(0.74f)
+                notchedDisk(radius = 0.62f, centerHole = 0.16f, notchOrbit = 0.42f,
+                    notchWidth = 0.17f, notchHeight = 0.06f)
+            }
+        }
+        return path
     }
 
     private fun drawHitGeometry(canvas: Canvas, feedback: HitFeedback) {
