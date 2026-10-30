@@ -8,17 +8,18 @@
 
   <g id="radial-core" fill="#C7C7BC"
      data-core-radius="18"
-     data-ray-side-length="36"
+     data-ray-side-length="27"
+     data-ray-to-core-radius="3:2"
      data-ray-apex-angle="22.5"
      data-ray-spacing="45">
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(45 72 72)" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(90 72 72)" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(135 72 72)" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(180 72 72)" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(225 72 72)" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(270 72 72)" />
-    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(315 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(45 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(90 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(135 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(180 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(225 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(270 72 72)" />
+    <path d="M72 72 L98.4812 66.7326 L98.4812 77.2674 Z" transform="rotate(315 72 72)" />
     <circle cx="72" cy="72" r="18" />
   </g>
 
@@ -27,7 +28,7 @@
         fill="none"
         stroke="#C7C7BC"
         stroke-width="7"
-        stroke-linecap="round"
+        stroke-linecap="butt"
         data-radius="68"
         data-sweep-angle="120" />
 </svg>
