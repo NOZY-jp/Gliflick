@@ -150,8 +150,8 @@ class CombatRenderer(context: Context) {
             val length = fragment.lengthAt(feedback.age)
             if (length > 0.05f) {
                 val center = fragment.positionAt(feedback.origin, feedback.age)
-                paint.color = red
-                paint.alpha = 245
+                paint.color = ink
+                paint.alpha = 255
                 paint.style = Paint.Style.FILL
                 canvas.save()
                 canvas.rotate(fragment.rotation * 180f / PI.toFloat(), center.x, center.y)

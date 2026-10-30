@@ -210,14 +210,14 @@ class HitFeedback(
 
     val fragments = List(FRAGMENT_COUNT) {
         val spread = (random.nextFloat() * 2f - 1f) * MAX_SPREAD_RADIANS
-        val travelAngle = incomingAngle + PI.toFloat() + spread
+        val travelAngle = incomingAngle + spread
         DamageFragment(
             travelAngle = travelAngle,
             rotation = travelAngle,
             initialLength = enemyRadius * (1.2f + random.nextFloat() * 1.4f),
             thickness = (enemyRadius * 0.28f).coerceAtLeast(1f),
             speed = 25f + random.nextFloat() * 45f,
-            lifetime = 0.25f + random.nextFloat() * 0.16f
+            lifetime = (0.25f + random.nextFloat() * 0.16f) * 1.5f
         )
     }
 
