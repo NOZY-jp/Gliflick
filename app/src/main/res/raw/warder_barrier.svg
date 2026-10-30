@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="112" height="112" viewBox="0 0 112 112"
+     role="img" aria-labelledby="title description">
+  <title id="title">Warder barrier</title>
+  <desc id="description">
+    A circular core with eight evenly spaced triangular rays, surrounded by a 120-degree barrier arc.
+  </desc>
+
+  <g id="radial-core" fill="#C7C7BC"
+     data-core-radius="18"
+     data-ray-side-length="36"
+     data-ray-apex-angle="22.5"
+     data-ray-spacing="45">
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(45 72 72)" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(90 72 72)" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(135 72 72)" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(180 72 72)" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(225 72 72)" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(270 72 72)" />
+    <path d="M72 72 L107.3083 64.9767 L107.3083 79.0233 Z" transform="rotate(315 72 72)" />
+    <circle cx="72" cy="72" r="18" />
+  </g>
+
+  <path id="barrier-arc"
+        d="M6.317 89.5997 A68 68 0 0 1 89.5997 6.317"
+        fill="none"
+        stroke="#C7C7BC"
+        stroke-width="7"
+        stroke-linecap="round"
+        data-radius="68"
+        data-sweep-angle="120" />
+</svg>
