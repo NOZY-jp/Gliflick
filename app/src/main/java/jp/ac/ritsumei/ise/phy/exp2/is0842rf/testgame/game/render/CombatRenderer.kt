@@ -89,11 +89,11 @@ class CombatRenderer(context: Context) {
         }
         drawPlayer(canvas, world)
         session.captions.forEach {
-            drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, it.placeBelowEnemy, it.size)
+            drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, it.placeBelowEnemy, it.radius)
         }
         session.completions.forEach {
             val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
-            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy, it.size)
+            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy, it.radius)
         }
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
@@ -132,7 +132,7 @@ class CombatRenderer(context: Context) {
         val width = max(12f, enemy.definition.radius * 2.6f) * 2f
         val left = enemy.position.x - width / 2f
         val barHeight = 1.5f
-        val gap = 8f * enemy.size
+        val gap = 8f
         val top = if (aboveEnemy) enemy.position.y - enemy.radius - gap - barHeight
         else enemy.position.y + enemy.radius + gap
         paint.style = Paint.Style.FILL
@@ -197,24 +197,26 @@ class CombatRenderer(context: Context) {
         when (pattern) {
             EnemyMarkerPattern.DOT -> circle(1f)
             EnemyMarkerPattern.RINGED_DOT -> {
-                circle(1f); circle(0.82f); circle(0.31f)
+                circle(1f); circle(0.94f); circle(0.5f)
             }
             EnemyMarkerPattern.DOUBLE_RINGED_DOT -> {
-                circle(1f); circle(0.86f); circle(0.70f); circle(0.56f); circle(0.30f)
+                circle(1f); circle(0.96f)
+                circle(2f / 2.83f); circle(0.67f)
+                circle(1f / 2.83f)
             }
             EnemyMarkerPattern.BULLSEYE -> {
-                circle(1f); circle(0.62f); circle(0.31f)
+                circle(1f); circle(2f / 2.83f); circle(1f / 2.83f)
             }
             EnemyMarkerPattern.CENTER_HOLE -> {
-                circle(1f); circle(0.15f)
+                circle(1f); circle(1f / 2.83f)
             }
             EnemyMarkerPattern.SEGMENTED_CENTER_HOLE -> notchedDisk(
-                radius = 1f, centerHole = 0.16f, notchOrbit = 0.67f,
+                radius = 1f, centerHole = 1f / 2.83f, notchOrbit = 0.67f,
                 notchWidth = 0.25f, notchHeight = 0.085f
             )
             EnemyMarkerPattern.RINGED_SEGMENTED_CENTER_HOLE -> {
                 circle(1f); circle(0.93f); circle(0.82f); circle(0.74f)
-                notchedDisk(radius = 0.62f, centerHole = 0.16f, notchOrbit = 0.42f,
+                notchedDisk(radius = 0.62f, centerHole = 1f / 2.83f, notchOrbit = 0.42f,
                     notchWidth = 0.17f, notchHeight = 0.06f)
             }
         }
@@ -282,7 +284,7 @@ class CombatRenderer(context: Context) {
     }
 
     private fun drawCaption(canvas: Canvas, state: WordMatchState, anchor: Vec2, alpha: Float,
-                            scale: Float, arenaWidth: Float, placeBelowEnemy: Boolean, enemySize: Float) {
+                            scale: Float, arenaWidth: Float, placeBelowEnemy: Boolean, enemyRadius: Float) {
         if (alpha <= 0f) return
         paint.typeface = light
         paint.textAlign = Paint.Align.LEFT
@@ -296,7 +298,8 @@ class CombatRenderer(context: Context) {
         paint.textSize = 10.5f
         val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
-        val centerY = anchor.y + (if (placeBelowEnemy) 34f else -22f) * enemySize
+        val wordOffset = if (placeBelowEnemy) enemyRadius + 29.5f else -(enemyRadius + 17.5f)
+        val centerY = anchor.y + wordOffset
         canvas.save()
         canvas.scale(scale, scale, centerX, centerY)
         paint.textSize = wordTextSize
@@ -315,7 +318,7 @@ class CombatRenderer(context: Context) {
         paint.textAlign = Paint.Align.CENTER
         paint.color = muted
         paint.alpha = (255f * alpha).toInt().coerceIn(0, 255)
-        canvas.drawText(state.definition.displayName, centerX, centerY - 16f * enemySize, paint)
+        canvas.drawText(state.definition.displayName, centerX, centerY - 16f, paint)
         canvas.restore()
         paint.alpha = 255
     }

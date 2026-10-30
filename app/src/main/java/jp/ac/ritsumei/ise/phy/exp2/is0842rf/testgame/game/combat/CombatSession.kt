@@ -8,7 +8,7 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordMatchState
 import kotlin.random.Random
 
 class EnemyCaption(val enemyId: Long, val word: WordDefinition, var anchor: Vec2, var state: WordMatchState,
-                   val placeBelowEnemy: Boolean = false, val size: Float = 1f) {
+                   val placeBelowEnemy: Boolean = false, val radius: Float = 4.5f) {
     var age = 0f
     var retired = false
     var fadeAge: Float? = null
@@ -17,7 +17,7 @@ class EnemyCaption(val enemyId: Long, val word: WordDefinition, var anchor: Vec2
 }
 
 class CompletedCaption(val state: WordMatchState, var anchor: Vec2, val placeBelowEnemy: Boolean = false,
-                       val size: Float = 1f) {
+                       val radius: Float = 4.5f) {
     var age = 0f
     val progress get() = (age / 0.42f).coerceIn(0f, 1f)
 }
@@ -97,7 +97,7 @@ class CombatSession(
         val caption = mutableCaptions.firstOrNull { it.word.id == id } ?: return
         val completed = engine.completedSnapshot(id) ?: caption.state.copy(isCompleted = true,
             matchedInputCharacters = caption.state.inputText.length)
-        mutableCompletions += CompletedCaption(completed, caption.anchor, caption.placeBelowEnemy, caption.size)
+        mutableCompletions += CompletedCaption(completed, caption.anchor, caption.placeBelowEnemy, caption.radius)
         mutableCaptions.remove(caption)
         if (caption.retired) {
             engine.removeWord(id)
@@ -106,7 +106,7 @@ class CombatSession(
             val next = selectWord(caption.enemyId)
             engine.replaceWord(id, next)
             mutableCaptions += EnemyCaption(caption.enemyId, next, caption.anchor,
-                engine.snapshot().first { it.definition.id == next.id }, caption.placeBelowEnemy, caption.size)
+                engine.snapshot().first { it.definition.id == next.id }, caption.placeBelowEnemy, caption.radius)
         }
     }
 
@@ -117,7 +117,7 @@ class CombatSession(
                 engine.addWord(word, pendingTokens)
                 val placeBelowEnemy = event.enemy.spawnOrigin.y < world.height / 2f
                 mutableCaptions += EnemyCaption(event.enemy.id, word, event.enemy.position,
-                    engine.snapshot().first { it.definition.id == word.id }, placeBelowEnemy, event.enemy.size)
+                    engine.snapshot().first { it.definition.id == word.id }, placeBelowEnemy, event.enemy.radius)
             }
             is CombatEvent.Died -> {
                 val caption = mutableCaptions.firstOrNull { it.enemyId == event.enemyId && !it.retired }

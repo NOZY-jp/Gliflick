@@ -7,17 +7,9 @@ data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExp
                                  val experienceIncreasePerLevel: Int = 20) {
     init { require(killExperience >= 0 && firstLevelExperience > 0 && experienceIncreasePerLevel >= 0) }
 }
-data class CombatConfig(val maxEnemies: Int = 8, val playerMaxHp: Int = 300,
+data class CombatConfig(val maxEnemies: Int = 16, val playerMaxHp: Int = 300,
                         val progression: ProgressionDefinition = ProgressionDefinition()) {
     init { require(maxEnemies >= 0 && playerMaxHp > 0) }
-
-    @Deprecated("Initial waves are controlled by EnemySpawnSchedule.")
-    constructor(initialEnemies: Int, maxEnemies: Int = 8, spawnInterval: Float = 2.8f,
-                playerMaxHp: Int = 300, progression: ProgressionDefinition = ProgressionDefinition()) :
-        this(maxEnemies, playerMaxHp, progression) {
-        require(initialEnemies == 0) { "Immediate enemy spawns have been removed." }
-        require(spawnInterval > 0f)
-    }
 }
 
 fun interface EnemySpawnPolicy {
@@ -38,7 +30,7 @@ class CombatWorld(
     private val random: Random = Random.Default,
     private val spawnPolicy: EnemySpawnPolicy = DroneEnemySpawnPolicy(),
     val mainWeapon: MainWeapon = Repeater(),
-    private val spawnSchedule: EnemySpawnSchedule = CompositeWaveSpawnSchedule()
+    private val spawnDensity: EnemySpawnDensity = RandomEnemySpawnDensity()
 ) {
     val player = Player(config.playerMaxHp)
     private val mutableEnemies = mutableListOf<Enemy>()
@@ -165,8 +157,7 @@ class CombatWorld(
         mutableProjectiles.removeAll(spent)
         val livingCount = mutableEnemies.count { it.isAlive }
         val availableSlots = (config.maxEnemies - livingCount).coerceAtLeast(0)
-        val requestedSpawns = spawnSchedule.update(dt, elapsedSeconds, level, random)
-        repeat(requestedSpawns.coerceAtMost(availableSlots)) {
+        if (availableSlots > 0 && spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level, random)
             spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
         }

@@ -10,20 +10,21 @@ data class DroneTierDefinition(
     val tier: Int,
     val maxHp: Int,
     val contactDamage: Int,
-    val markerPattern: EnemyMarkerPattern
+    val markerPattern: EnemyMarkerPattern,
+    val bodyScale: Float
 ) {
-    init { require(tier > 0 && maxHp > 0 && contactDamage >= 0) }
+    init { require(tier > 0 && maxHp > 0 && contactDamage >= 0 && bodyScale > 0f) }
 }
 
 object DroneTierCatalog {
     val tiers = listOf(
-        DroneTierDefinition(1, 80, 40, EnemyMarkerPattern.DOT),
-        DroneTierDefinition(2, 200, 60, EnemyMarkerPattern.RINGED_DOT),
-        DroneTierDefinition(3, 500, 90, EnemyMarkerPattern.DOUBLE_RINGED_DOT),
-        DroneTierDefinition(4, 1_000, 120, EnemyMarkerPattern.BULLSEYE),
-        DroneTierDefinition(5, 1_800, 150, EnemyMarkerPattern.CENTER_HOLE),
-        DroneTierDefinition(6, 3_200, 180, EnemyMarkerPattern.SEGMENTED_CENTER_HOLE),
-        DroneTierDefinition(7, 5_800, 210, EnemyMarkerPattern.RINGED_SEGMENTED_CENTER_HOLE)
+        DroneTierDefinition(1, 80, 40, EnemyMarkerPattern.DOT, 1f),
+        DroneTierDefinition(2, 200, 60, EnemyMarkerPattern.RINGED_DOT, 2f),
+        DroneTierDefinition(3, 500, 90, EnemyMarkerPattern.DOUBLE_RINGED_DOT, 2.83f),
+        DroneTierDefinition(4, 1_000, 120, EnemyMarkerPattern.BULLSEYE, 2.83f),
+        DroneTierDefinition(5, 1_800, 150, EnemyMarkerPattern.CENTER_HOLE, 2.83f),
+        DroneTierDefinition(6, 3_200, 180, EnemyMarkerPattern.SEGMENTED_CENTER_HOLE, 2.83f),
+        DroneTierDefinition(7, 5_800, 210, EnemyMarkerPattern.RINGED_SEGMENTED_CENTER_HOLE, 2.83f)
     )
 
     val highestPublishedTier get() = tiers.last().tier
@@ -38,7 +39,7 @@ object DroneTierCatalog {
             speed = BASE_SPEED * mutation.speedMultiplier,
             contactDamage = balance.contactDamage,
             radius = BASE_RADIUS,
-            size = mutation.sizeMultiplier,
+            size = balance.bodyScale * mutation.sizeMultiplier,
             tier = balance.tier,
             mutation = mutation
         )
@@ -70,6 +71,7 @@ data class DroneTierProbability(val tier: Int, val probability: Double)
 
 /**
  * Smoothly shifts a Gaussian-like tier distribution using elapsed time and player level.
+ * Each new tier fades into the pool over one progression step, so a fresh run starts at Tier 1.
  * The exact source-game Threat formula is unpublished, so the rates remain tuning parameters.
  */
 class DroneTierDistributionPolicy(
@@ -84,7 +86,12 @@ class DroneTierDistributionPolicy(
         val spread = min(parameters.initialSpread + progression * parameters.spreadGrowthPerTier,
             parameters.maximumSpread)
         val weights = DroneTierCatalog.tiers.take(parameters.maximumTier).map { tier ->
-            exp(-0.5 * ((tier.tier - center) / spread) * ((tier.tier - center) / spread))
+            val distance = (tier.tier - center) / spread
+            val gaussianWeight = exp(-0.5 * distance * distance)
+            val unlockProgress = if (tier.tier == 1) 1.0 else
+                (progression - (tier.tier - 2)).coerceIn(0.0, 1.0)
+            val smoothUnlock = unlockProgress * unlockProgress * (3.0 - 2.0 * unlockProgress)
+            gaussianWeight * smoothUnlock
         }
         val totalWeight = weights.sum()
         return weights.mapIndexed { index, weight ->
