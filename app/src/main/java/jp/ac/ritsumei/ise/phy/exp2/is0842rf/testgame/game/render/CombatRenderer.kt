@@ -67,7 +67,7 @@ class CombatRenderer(context: Context) {
             when (enemy.definition.shape) {
                 EnemyShape.CIRCLE -> canvas.drawCircle(enemy.position.x, enemy.position.y, enemy.definition.radius, paint)
             }
-            drawEnemyHealthBar(canvas, enemy, alpha)
+            drawEnemyHealthBar(canvas, enemy, alpha, enemy.spawnOrigin.y < world.height / 2f)
         }
         world.hitFeedback.forEach { drawHitGeometry(canvas, it) }
         world.projectiles.forEach { bullet ->
@@ -84,10 +84,12 @@ class CombatRenderer(context: Context) {
             canvas.drawCircle(bullet.position.x, bullet.position.y, bullet.radius, paint)
         }
         drawPlayer(canvas, world)
-        session.captions.forEach { drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, height) }
+        session.captions.forEach {
+            drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, it.placeBelowEnemy)
+        }
         session.completions.forEach {
             val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
-            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, height)
+            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy)
         }
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
@@ -121,18 +123,20 @@ class CombatRenderer(context: Context) {
         centered(canvas, "${world.player.hp} / ${world.player.maxHp}", p.x, p.y + 46f, 10f, muted)
     }
 
-    private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int) {
+    private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int, aboveEnemy: Boolean) {
         if (enemy.hp >= enemy.definition.maxHp) return
         val width = max(12f, enemy.definition.radius * 2.6f) * 2f
         val left = enemy.position.x - width / 2f
-        val top = enemy.position.y + enemy.definition.radius + 8f
+        val barHeight = 1.5f
+        val top = if (aboveEnemy) enemy.position.y - enemy.definition.radius - 8f - barHeight
+        else enemy.position.y + enemy.definition.radius + 8f
         paint.style = Paint.Style.FILL
         paint.alpha = alpha
         paint.color = Color.rgb(199, 199, 199)
-        canvas.drawRect(left, top, left + width, top + 1.5f, paint)
+        canvas.drawRect(left, top, left + width, top + barHeight, paint)
         paint.color = Color.rgb(117, 117, 117)
         val hpFraction = (enemy.hp.toFloat() / enemy.definition.maxHp).coerceIn(0f, 1f)
-        canvas.drawRect(left, top, left + width * hpFraction, top + 1.5f, paint)
+        canvas.drawRect(left, top, left + width * hpFraction, top + barHeight, paint)
         paint.alpha = 255
     }
 
@@ -197,7 +201,7 @@ class CombatRenderer(context: Context) {
     }
 
     private fun drawCaption(canvas: Canvas, state: WordMatchState, anchor: Vec2, alpha: Float,
-                            scale: Float, arenaWidth: Float, arenaHeight: Float) {
+                            scale: Float, arenaWidth: Float, placeBelowEnemy: Boolean) {
         if (alpha <= 0f) return
         paint.typeface = light
         paint.textAlign = Paint.Align.LEFT
@@ -207,17 +211,11 @@ class CombatRenderer(context: Context) {
         if (naturalWidth > maxWidth) paint.textSize *= maxWidth / naturalWidth
         val wordTextSize = paint.textSize
         val textWidth = paint.measureText(state.inputText)
-        val centerX = anchor.x.coerceIn(textWidth / 2f + 8f, arenaWidth - textWidth / 2f - 8f)
-        val wordMetrics = paint.fontMetrics
+        val centerX = anchor.x
         paint.textSize = 10.5f
         val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
-        val labelMetrics = paint.fontMetrics
-        val topOffset = min(wordMetrics.ascent, -16f + labelMetrics.ascent)
-        val bottomOffset = max(wordMetrics.descent, -16f + labelMetrics.descent)
-        val minCenterY = 8f - topOffset
-        val maxCenterY = (arenaHeight - 8f - bottomOffset).coerceAtLeast(minCenterY)
-        val centerY = (anchor.y - 22f).coerceIn(minCenterY, maxCenterY)
+        val centerY = anchor.y + if (placeBelowEnemy) 22f else -22f
         canvas.save()
         canvas.scale(scale, scale, centerX, centerY)
         paint.textSize = wordTextSize

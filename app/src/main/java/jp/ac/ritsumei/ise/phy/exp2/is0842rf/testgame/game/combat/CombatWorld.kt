@@ -71,7 +71,11 @@ class CombatWorld(
         if (!first) {
             val sx = newWidth / width
             val sy = newHeight / height
-            mutableEnemies.forEach { it.position = it.position.scaled(sx, sy); it.previousPosition = it.position }
+            mutableEnemies.forEach {
+                it.position = it.position.scaled(sx, sy)
+                it.previousPosition = it.position
+                it.spawnOrigin = it.spawnOrigin.scaled(sx, sy)
+            }
             mutableProjectiles.forEach {
                 it.position = it.position.scaled(sx, sy)
                 it.previousPosition = it.position
@@ -86,9 +90,8 @@ class CombatWorld(
         player.position = Vec2(width / 2f, height / 2f)
     }
 
-    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level),
-                   spawnEdge: SpawnEdge? = null): Enemy =
-        Enemy(nextEnemyId++, definition, position, spawnEdge).also {
+    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level)): Enemy =
+        Enemy(nextEnemyId++, definition, position).also {
         mutableEnemies += it
         events += CombatEvent.Spawned(it)
     }
@@ -165,8 +168,7 @@ class CombatWorld(
         val requestedSpawns = spawnSchedule.update(dt, elapsedSeconds, level, random)
         repeat(requestedSpawns.coerceAtMost(availableSlots)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level)
-            val point = spawnPoint(definition.radius)
-            spawnEnemy(point.position, definition, point.edge)
+            spawnEnemy(spawnPosition(definition.radius), definition)
         }
     }
 
@@ -184,25 +186,23 @@ class CombatWorld(
         }
     }
 
-    private data class SpawnPoint(val position: Vec2, val edge: SpawnEdge)
-
-    private fun spawnPoint(radius: Float): SpawnPoint {
+    private fun spawnPosition(radius: Float): Vec2 {
         val margin = radius + 12f
         fun across(limit: Float): Float {
             val low = margin.coerceAtMost(limit / 2f)
             val high = (limit - margin).coerceAtLeast(low)
             return if (high <= low) limit / 2f else low + random.nextFloat() * (high - low)
         }
-        fun candidate(): SpawnPoint = when (random.nextInt(4)) {
-            0 -> SpawnPoint(Vec2(across(width), -margin), SpawnEdge.TOP)
-            1 -> SpawnPoint(Vec2(width + margin, across(height)), SpawnEdge.RIGHT)
-            2 -> SpawnPoint(Vec2(across(width), height + margin), SpawnEdge.BOTTOM)
-            else -> SpawnPoint(Vec2(-margin, across(height)), SpawnEdge.LEFT)
+        fun candidate(): Vec2 = when (random.nextInt(4)) {
+            0 -> Vec2(across(width), -margin)
+            1 -> Vec2(width + margin, across(height))
+            2 -> Vec2(across(width), height + margin)
+            else -> Vec2(-margin, across(height))
         }
         return List(32) { candidate() }.maxBy { point ->
-            minOf((point.position - player.position).length(),
+            minOf((point - player.position).length(),
                 mutableEnemies.filter { it.isAlive }
-                    .minOfOrNull { (point.position - it.position).length() } ?: Float.MAX_VALUE)
+                    .minOfOrNull { (point - it.position).length() } ?: Float.MAX_VALUE)
         }
     }
 

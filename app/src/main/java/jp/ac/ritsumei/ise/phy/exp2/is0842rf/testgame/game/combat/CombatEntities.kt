@@ -20,7 +20,6 @@ data class Vec2(val x: Float, val y: Float) {
 enum class EnemyKind { DRONE }
 enum class EnemyVariant { NORMAL }
 enum class EnemyShape { CIRCLE }
-enum class SpawnEdge { TOP, RIGHT, BOTTOM, LEFT }
 
 /** Reserved difficulty value. Its progression and gameplay effect are intentionally undefined. */
 data class Threat(val value: Double) {
@@ -67,8 +66,9 @@ class PursuePlayer : EnemyBehavior {
     }
 }
 
-class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2,
-            val spawnEdge: SpawnEdge? = null) {
+class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
+    var spawnOrigin = position
+        internal set
     private val behavior = definition.behaviorFactory()
     private val durability = definition.durabilityFactory(definition.maxHp)
     var previousPosition = position
