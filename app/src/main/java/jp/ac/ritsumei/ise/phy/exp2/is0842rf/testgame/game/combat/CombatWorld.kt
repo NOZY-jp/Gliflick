@@ -1,6 +1,7 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat
 
 import kotlin.random.Random
+import kotlin.math.atan2
 
 data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExperience: Int = 50,
                                  val experienceIncreasePerLevel: Int = 20) {
@@ -34,9 +35,11 @@ class CombatWorld(
     private val mutableEnemies = mutableListOf<Enemy>()
     private val mutableProjectiles = mutableListOf<Projectile>()
     private val mutableBursts = mutableListOf<DeathBurst>()
+    private val mutableHitFeedback = mutableListOf<HitFeedback>()
     val enemies: List<Enemy> get() = mutableEnemies
     val projectiles: List<Projectile> get() = mutableProjectiles
     val deathBursts: List<DeathBurst> get() = mutableBursts
+    val hitFeedback: List<HitFeedback> get() = mutableHitFeedback
     private val events = mutableListOf<CombatEvent>()
     private var nextEnemyId = 1L
     private var spawnClock = 0f
@@ -64,6 +67,7 @@ class CombatWorld(
                 it.velocity = it.velocity.scaled(sx, sy).normalized() * it.velocity.length()
             }
             mutableBursts.forEach { it.origin = it.origin.scaled(sx, sy) }
+            mutableHitFeedback.forEach { it.resize(sx, sy) }
             mainWeapon.resize(sx, sy)
         }
         width = newWidth
@@ -82,9 +86,13 @@ class CombatWorld(
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let { mainWeapon.target(it.id, it.position) }
     }
 
-    fun damageEnemy(enemyId: Long, damage: Int) {
+    fun damageEnemy(enemyId: Long, damage: Int, impactAngle: Float? = null) {
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
-            it.takeDamage(damage)
+            val applied = it.takeDamage(damage)
+            if (applied > 0) {
+                val angle = impactAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
+                mutableHitFeedback += HitFeedback(it.position, applied, it.definition.radius, angle, random)
+            }
             if (!it.isAlive) die(it, awardExperience = true)
         }
     }
@@ -96,6 +104,8 @@ class CombatWorld(
         if (width == 0f) return
         mutableBursts.forEach { it.advance(dt) }
         mutableBursts.removeAll { it.isFinished }
+        mutableHitFeedback.forEach { it.advance(dt) }
+        mutableHitFeedback.removeAll { it.isFinished }
         mutableEnemies.forEach { enemy -> enemy.deathAge?.let { enemy.deathAge = it + dt } }
         mutableEnemies.removeAll { (it.deathAge ?: 0f) >= DEATH_FADE_SECONDS }
         if (isGameOver) return
@@ -122,9 +132,15 @@ class CombatWorld(
                     ?.let { enemy to it }
             }.minByOrNull { it.second }
             if (hit != null) {
-                projectile.position = projectile.previousPosition +
+                val impactPosition = projectile.previousPosition +
                     (projectile.position - projectile.previousPosition) * hit.second
-                hit.first.takeDamage(projectile.damage)
+                projectile.position = impactPosition
+                val applied = hit.first.takeDamage(projectile.damage)
+                if (applied > 0) {
+                    val impactAngle = atan2(projectile.velocity.y, projectile.velocity.x)
+                    mutableHitFeedback += HitFeedback(impactPosition, applied,
+                        hit.first.definition.radius, impactAngle, random)
+                }
                 if (!hit.first.isAlive) die(hit.first, awardExperience = true)
                 spent += projectile
             } else if (projectile.position.x !in -32f..width + 32f ||

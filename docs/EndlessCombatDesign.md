@@ -32,7 +32,7 @@ The pool is grouped by `readingLength` and currently contains:
 | 6 | 100 |
 | 7 | 100 |
 
-The curated list contains 747 entries; every reading-length group has at least 100 candidates. It uses standalone words and established compounds. The only particle-bearing expressions are the two requested idioms, 「黄泉の国」 and 「虎の巻」.
+The curated list contains 747 entries; every reading-length group has at least 100 candidates. It uses standalone words and established compounds, excludes する-verbs, and limits particle-bearing expressions to the two requested idioms, 「黄泉の国」 and 「虎の巻」.
 
 `ProgressiveGaussianWordLengthPolicy` controls which groups are available and the Gaussian centre. The maximum starts at three and increases once every four minutes, reaching seven at 16 minutes. The centre starts at two and increases by 0.5 once every two minutes, reaching six at 16 minutes. Standard deviation starts at one and is configurable. For each available length `n`, the policy uses `exp(-0.5 * ((n - centre) / standardDeviation)^2)` and normalizes across the unlocked groups that contain unused words. It chooses a length first, then selects uniformly within that group so group size does not multiply the length probability. At the boundaries, truncating a discrete distribution means the observed sample average may differ slightly from its centre.
 
@@ -52,6 +52,12 @@ Completion queues three shots in FIFO burst order, with 120ms between shots. Eac
 On word completion, the old prompt scales 1x to 2x about its own centre and fades over 420ms with ease-in/out. The replacement fades in over 240ms. Shared and nested word matching keeps the existing contract.
 
 On enemy death, its body and inactive caption fade over 140ms. Ten independently sized square particles fly radially at random angles; their size follows 0 -> 1 -> 0. A partially typed caption is pinned to the death point, retired from new targeting, and retained until its existing input completes or fails. Its continuation prevents a false mistake while clearing the label, but awards no additional reading streak, overlap bonus, shot, or kill XP. Newly spawned words never consume already observed composition text.
+
+## Hit feedback
+
+When a projectile reduces an enemy's HP, `CombatWorld` records the hit position, actual HP reduction, enemy radius, and incoming shot angle in one `HitFeedback`. `CombatRenderer` draws a small health bar under that enemy only while HP is below maximum; its fill uses current HP, and it follows the enemy's death fade.
+
+The damage number starts above the impact and drifts upward 18dp over 640ms while opacity changes 100% -> 0% and scale changes 100% -> 50%. The impact ring lasts 240ms, with radius 100% -> 120% of the enemy radius and stroke width 30% -> 0% of that radius. Ten narrow rectangular fragments are emitted per hit; each travels within Θ + 180° ± 120°, oriented along its travel direction, with randomized initial length and speed. Its length falls linearly to zero over 250–410ms. These are independent hit effects, so a lethal hit can show both hit feedback and the existing death burst.
 
 ## Initial balance choices
 

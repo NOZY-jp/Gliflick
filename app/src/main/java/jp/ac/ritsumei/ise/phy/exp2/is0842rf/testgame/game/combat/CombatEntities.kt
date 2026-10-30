@@ -72,7 +72,11 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
         previousPosition = position
         if (isAlive) behavior.update(this, dt, destination)
     }
-    fun takeDamage(damage: Int) { durability.takeDamage(damage) }
+    fun takeDamage(damage: Int): Int {
+        val hpBefore = hp
+        durability.takeDamage(damage)
+        return (hpBefore - hp).coerceAtLeast(0)
+    }
 }
 
 class Player(val maxHp: Int = 300, val radius: Float = 11f) {
@@ -166,6 +170,70 @@ class DeathBurst(var origin: Vec2, random: Random) {
     }
     val isFinished get() = particles.all { age >= it.lifetime }
     fun advance(dt: Float) { age += dt }
+}
+
+data class DamageFragment(
+    val travelAngle: Float,
+    val rotation: Float,
+    val initialLength: Float,
+    val thickness: Float,
+    val speed: Float,
+    val lifetime: Float
+) {
+    fun progressAt(age: Float) = (age / lifetime).coerceIn(0f, 1f)
+    fun lengthAt(age: Float) = initialLength * (1f - progressAt(age))
+    fun positionAt(origin: Vec2, age: Float): Vec2 {
+        val travelTime = age.coerceIn(0f, lifetime)
+        return origin + Vec2(cos(travelAngle), sin(travelAngle)) * (speed * travelTime)
+    }
+}
+
+/** Presentation state for a single projectile impact; all animation timing stays in simulation time. */
+class HitFeedback(
+    var origin: Vec2,
+    val damage: Int,
+    var enemyRadius: Float,
+    impactAngle: Float,
+    random: Random
+) {
+    var age = 0f
+        private set
+
+    val numberProgress get() = (age / DAMAGE_NUMBER_LIFETIME).coerceIn(0f, 1f)
+    val numberAlpha get() = 1f - numberProgress
+    val numberScale get() = 1f - 0.5f * numberProgress
+    val numberBaseline get() = origin.y - enemyRadius - 7f - 18f * numberProgress
+    val ringProgress get() = (age / RING_LIFETIME).coerceIn(0f, 1f)
+    val ringRadius get() = enemyRadius * (1f + 0.2f * ringProgress)
+    val ringStrokeWidth get() = enemyRadius * 0.3f * (1f - ringProgress)
+    val isFinished get() = age >= DAMAGE_NUMBER_LIFETIME
+
+    val fragments = List(FRAGMENT_COUNT) {
+        val spread = (random.nextFloat() * 2f - 1f) * MAX_SPREAD_RADIANS
+        val travelAngle = impactAngle + PI.toFloat() + spread
+        DamageFragment(
+            travelAngle = travelAngle,
+            rotation = travelAngle,
+            initialLength = enemyRadius * (0.7f + random.nextFloat() * 0.9f),
+            thickness = (enemyRadius * 0.18f).coerceAtLeast(0.65f),
+            speed = 18f + random.nextFloat() * 36f,
+            lifetime = 0.25f + random.nextFloat() * 0.16f
+        )
+    }
+
+    fun advance(dt: Float) { age += dt }
+
+    fun resize(xScale: Float, yScale: Float) {
+        origin = origin.scaled(xScale, yScale)
+        enemyRadius *= kotlin.math.sqrt(kotlin.math.abs(xScale * yScale))
+    }
+
+    companion object {
+        const val FRAGMENT_COUNT = 10
+        const val DAMAGE_NUMBER_LIFETIME = 0.64f
+        const val RING_LIFETIME = 0.24f
+        private const val MAX_SPREAD_RADIANS = 2f * PI.toFloat() / 3f
+    }
 }
 
 /** First contact in relative-motion space, including a segment starting inside the circle. */

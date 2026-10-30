@@ -10,6 +10,8 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.CombatSession
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.CombatWorld
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.Enemy
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.HitFeedback
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.Vec2
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.EnemyShape
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordMatchState
@@ -58,13 +60,16 @@ class CombatRenderer(context: Context) {
             }
         } }
         world.enemies.forEach { enemy ->
-            paint.color = red
-            paint.alpha = (255f * (1f - (enemy.deathAge ?: 0f) / CombatWorld.DEATH_FADE_SECONDS)
+            val alpha = (255f * (1f - (enemy.deathAge ?: 0f) / CombatWorld.DEATH_FADE_SECONDS)
                 .coerceIn(0f, 1f)).toInt()
+            paint.color = red
+            paint.alpha = alpha
             when (enemy.definition.shape) {
                 EnemyShape.CIRCLE -> canvas.drawCircle(enemy.position.x, enemy.position.y, enemy.definition.radius, paint)
             }
+            drawEnemyHealthBar(canvas, enemy, alpha)
         }
+        world.hitFeedback.forEach { drawHitGeometry(canvas, it) }
         world.projectiles.forEach { bullet ->
             val tail = bullet.position - bullet.velocity.normalized() * min(30f, bullet.age * bullet.velocity.length())
             if ((bullet.position - tail).length() > 0.001f) {
@@ -84,6 +89,7 @@ class CombatRenderer(context: Context) {
             val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
             drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width)
         }
+        world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
         if (world.isGameOver) {
             paint.color = Color.argb(200, 239, 239, 229)
@@ -113,6 +119,68 @@ class CombatRenderer(context: Context) {
         canvas.drawRect(p.x - 21f, p.y + 29f, p.x - 21f + 42f * world.player.hp / world.player.maxHp,
             p.y + 32f, paint)
         centered(canvas, "${world.player.hp} / ${world.player.maxHp}", p.x, p.y + 46f, 10f, muted)
+    }
+
+    private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int) {
+        if (enemy.hp >= enemy.definition.maxHp) return
+        val width = max(12f, enemy.definition.radius * 2.6f)
+        val left = enemy.position.x - width / 2f
+        val top = enemy.position.y + enemy.definition.radius + 3f
+        paint.style = Paint.Style.FILL
+        paint.alpha = alpha
+        paint.color = Color.rgb(199, 199, 188)
+        canvas.drawRect(left, top, left + width, top + 1.5f, paint)
+        paint.color = red
+        val hpFraction = (enemy.hp.toFloat() / enemy.definition.maxHp).coerceIn(0f, 1f)
+        canvas.drawRect(left, top, left + width * hpFraction, top + 1.5f, paint)
+        paint.alpha = 255
+    }
+
+    private fun drawHitGeometry(canvas: Canvas, feedback: HitFeedback) {
+        if (feedback.ringStrokeWidth > 0.01f) {
+            paint.color = red
+            paint.alpha = 230
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = feedback.ringStrokeWidth
+            canvas.drawCircle(feedback.origin.x, feedback.origin.y, feedback.ringRadius, paint)
+            paint.style = Paint.Style.FILL
+        }
+
+        feedback.fragments.forEach { fragment ->
+            val length = fragment.lengthAt(feedback.age)
+            if (length > 0.05f) {
+                val center = fragment.positionAt(feedback.origin, feedback.age)
+                paint.color = muted
+                paint.alpha = 220
+                paint.style = Paint.Style.FILL
+                canvas.save()
+                canvas.rotate(fragment.rotation * 180f / PI.toFloat(), center.x, center.y)
+                canvas.drawRect(center.x - length / 2f, center.y - fragment.thickness / 2f,
+                    center.x + length / 2f, center.y + fragment.thickness / 2f, paint)
+                canvas.restore()
+            }
+        }
+
+        paint.alpha = 255
+        paint.style = Paint.Style.FILL
+    }
+
+    private fun drawDamageNumber(canvas: Canvas, feedback: HitFeedback) {
+        if (feedback.numberAlpha > 0f) {
+            val x = feedback.origin.x
+            val baseline = feedback.numberBaseline
+            paint.color = muted
+            paint.alpha = (255f * feedback.numberAlpha).toInt().coerceIn(0, 255)
+            paint.typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            paint.textAlign = Paint.Align.CENTER
+            paint.textSize = 11f
+            canvas.save()
+            canvas.scale(feedback.numberScale, feedback.numberScale, x, baseline)
+            canvas.drawText(feedback.damage.toString(), x, baseline, paint)
+            canvas.restore()
+        }
+        paint.alpha = 255
+        paint.style = Paint.Style.FILL
     }
 
     private fun drawHud(canvas: Canvas, world: CombatWorld, width: Float) {
