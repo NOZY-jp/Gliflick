@@ -10,6 +10,7 @@
 - Preserve the minimal composition: no visible instructional captions or retry explanations on the title screen unless explicitly requested. The Figma `Launch IME` action is shown only while the system keyboard is hidden. Completion scales 1× to 2× around the word's own fixed centre and fades opacity 100% to 0%.
 - The latest Figma frame is `14:97`; its grid comes from `app/src/main/res/drawable-nodpi/menu_grid.png`, regenerated with `docs/verification/render-menu-grid.py`. Background circles and squares remain native shapes, independently animated outward and faded away during completion; do not flatten those shapes into the grid PNG.
 - Tapping a menu command simulates one character every 50ms. Keep the four menu rows aligned at the Figma left edge and use their text lengths to form the rising/falling right edge.
+- Preserve the completed title transition frame while the destination is covering TitleActivity; resetting MenuBackdropView during the outgoing onPause can redraw shapes that already faded away. Reset the menu and backdrop after returning to the title.
 - Menu and gameplay share GameImeEditText and WordMatchEngine; menus only adapt static targets/navigation, and English belongs in TypingLanguage. Do not add a separate correctness algorithm or discard a failing character before considering it as a fresh word start. Keep armorarmory and continuously highlighted aaaaa in regression coverage. Instrumented notification replay is not human keyboard evidence.
 
 ## Play scene

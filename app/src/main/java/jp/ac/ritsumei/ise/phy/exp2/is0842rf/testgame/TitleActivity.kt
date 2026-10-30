@@ -39,6 +39,7 @@ class TitleActivity : AppCompatActivity() {
     private var menuInput = menuController.currentInput()
     private var resumed = false
     private var selecting = false
+    private var navigationInProgress = false
     private var typingTick: Runnable? = null
     private var zoom: ValueAnimator? = null
     private var overlay: TextView? = null
@@ -181,6 +182,7 @@ class TitleActivity : AppCompatActivity() {
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationCancel(animation: Animator) { cancelled = true }
                 override fun onAnimationEnd(animation: Animator) {
+                    zoom = null
                     if (!cancelled && resumed) navigate(command)
                 }
             })
@@ -190,6 +192,7 @@ class TitleActivity : AppCompatActivity() {
 
     private fun navigate(command: MenuCommand) {
         val destination = if (command == MenuCommand.PLAY) CombatActivity::class.java else MainActivity::class.java
+        navigationInProgress = true
         startActivity(Intent(this, destination)
             .putExtra(MainActivity.EXTRA_MENU_COMMAND, command.text))
         @Suppress("DEPRECATION")
@@ -199,6 +202,10 @@ class TitleActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        if (navigationInProgress) {
+            navigationInProgress = false
+            resetMenuSelection()
+        }
         requestMenuInput()
     }
 
@@ -220,8 +227,17 @@ class TitleActivity : AppCompatActivity() {
         resumed = false
         typingTick?.let(root::removeCallbacks)
         typingTick = null
-        zoom?.cancel()
-        zoom = null
+        if (!navigationInProgress) {
+            // Restoring the menu here exposes the fully drawn shapes for a frame
+            // while Android is still covering this window with the destination.
+            zoom?.cancel()
+            zoom = null
+            resetMenuSelection()
+        }
+        super.onPause()
+    }
+
+    private fun resetMenuSelection() {
         overlay?.let(root::removeView)
         overlay = null
         if (selecting) {
@@ -235,7 +251,6 @@ class TitleActivity : AppCompatActivity() {
         backdrop.transitionProgress = 0f
         content.rows.values.forEach { it.alpha = 1f }
         selecting = false
-        super.onPause()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
