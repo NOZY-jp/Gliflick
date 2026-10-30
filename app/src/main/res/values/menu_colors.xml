@@ -1,6 +1,7 @@
 <resources>
-    <color name="menu_background">#FFFFFF</color>
-    <color name="menu_ink">#555555</color>
+    <color name="menu_background">#EFEFE5</color>
+    <color name="menu_ink">#464646</color>
     <color name="menu_untyped">#B8B8B8</color>
-    <color name="menu_grid">#F3F3F3</color>
+    <color name="menu_grid">#E4E4D8</color>
+    <color name="menu_shape">#C7C7BC</color>
 </resources>

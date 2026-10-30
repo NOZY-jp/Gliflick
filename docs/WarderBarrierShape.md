@@ -10,4 +10,4 @@ The reusable vector is [warder_barrier.svg](../app/src/main/res/raw/warder_barri
 - The arc radius is 68 and stroke width is 7, chosen from the rough reference's proportions because only its sweep angle was specified.
 - The shape uses Figma Frame 3's `#C7C7BC` and has a transparent background. The frame background is `#EFEFE5`.
 
-This is a source asset for later use; no screen layout or animation was changed as part of creating it.
+The SVG is rendered into a high-resolution transparent bitmap for the Android Canvas scene and placed in the Frame 3 title backdrop at `(504, 1229)` in the 1080-unit design coordinate system. It fades with the other background marks during menu completion. The native SVG remains the source of truth.

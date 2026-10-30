@@ -101,3 +101,7 @@ Android 17ではインストール直後のPackageUpdateActivityが起動先を�
 ### 改訂Figmaフレーム14:97
 
 タップ入力間隔を50msに短縮し、Figma座標に合わせてステータスバー分のずれを解消。方眼PNGをフレーム14:98から更新し、IME非表示時の `Launch IME` ボタンを追加。Pixel 7aで配置、ボタンの表示／IME再表示を手動確認。今回、自動テストと新しい人の実打鍵は実施していない。詳細は [title-menu-figma14-20261030.md](title-menu-figma14-20261030.md)。
+
+### Frame 3の配色と装飾
+
+`#EFEFE5`背景、`#E4E4D8`方眼、`#C7C7BC`の大図形・装飾、`#464646`の文字を反映。ターゲット、ナビゲーション印、母線:半径3:2のWarder印をSVGから透過PNGへ高解像度化し、Canvas背景へ配置。Pixel 7aで画面全体と各装飾の位置を確認し、Debug build成功。自動テスト・新しい人の実打鍵は行っていない。画面は [title-frame3-device.png](title-frame3-device.png)、再生成は `uv run --with cairosvg python docs/verification/render-menu-grid.py`。

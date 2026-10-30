@@ -1,4 +1,4 @@
-"""Rasterize the updated Figma grid while leaving animated outlines as native shapes."""
+"""Rasterize Frame 3's grid and vector marks for the Android Canvas renderer."""
 
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -7,9 +7,9 @@ import cairosvg
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "docs/verification/figma-backdrop-frame-14-98.svg"
-VECTOR_OUTPUT = ROOT / "docs/verification/figma-grid-frame-14-97.svg"
-PNG_OUTPUT = ROOT / "app/src/main/res/drawable-nodpi/menu_grid.png"
+SOURCE = ROOT / "docs/verification/frame3-assets/grid.svg"
+VECTOR_OUTPUT = ROOT / "docs/verification/figma-grid-frame-3.svg"
+RESOURCE_DIR = ROOT / "app/src/main/res/drawable-nodpi"
 WIDTH = 1080
 HEIGHT = 4096
 NS = "http://www.w3.org/2000/svg"
@@ -47,7 +47,7 @@ while last_y + 198 < HEIGHT:
             "y1": str(last_y),
             "x2": str(WIDTH),
             "y2": str(last_y),
-            "stroke": "#F3F3F3",
+            "stroke": "#E4E4D8",
             "stroke-width": "3",
         },
     )
@@ -55,11 +55,21 @@ while last_y + 198 < HEIGHT:
 ET.indent(grid, space="  ")
 svg_bytes = ET.tostring(grid, encoding="utf-8", xml_declaration=True)
 VECTOR_OUTPUT.write_bytes(svg_bytes)
-PNG_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+RESOURCE_DIR.mkdir(parents=True, exist_ok=True)
 cairosvg.svg2png(
     bytestring=svg_bytes,
-    write_to=str(PNG_OUTPUT),
+    write_to=str(RESOURCE_DIR / "menu_grid.png"),
     output_width=WIDTH,
     output_height=HEIGHT,
 )
-print(f"Wrote {PNG_OUTPUT.relative_to(ROOT)} ({WIDTH}x{HEIGHT})")
+for source, name in (
+    (ROOT / "app/src/main/res/raw/title_target.svg", "title_target.png"),
+    (ROOT / "app/src/main/res/raw/title_navigation_marks.svg", "title_navigation_marks.png"),
+    (ROOT / "app/src/main/res/raw/warder_barrier.svg", "warder_barrier.png"),
+):
+    cairosvg.svg2png(
+        url=str(source),
+        write_to=str(RESOURCE_DIR / name),
+        scale=4,
+    )
+print(f"Wrote Frame 3 backdrop PNGs to {RESOURCE_DIR.relative_to(ROOT)}")

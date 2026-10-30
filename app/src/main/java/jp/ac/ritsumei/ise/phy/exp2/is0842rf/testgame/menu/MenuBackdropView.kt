@@ -26,13 +26,17 @@ class MenuBackdropView(context: Context) : View(context) {
         R.drawable.menu_grid,
         BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ALPHA_8 }
     ) ?: error("The title grid PNG could not be decoded")
+    private val targetBitmap = decodeBitmap(R.drawable.title_target)
+    private val navigationMarksBitmap = decodeBitmap(R.drawable.title_navigation_marks)
+    private val warderBitmap = decodeBitmap(R.drawable.warder_barrier)
     private val gridPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
         color = context.getColor(R.color.menu_grid)
     }
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = context.getColor(R.color.menu_grid)
+        color = context.getColor(R.color.menu_shape)
         style = Paint.Style.STROKE
     }
+    private val decorationPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
     private var circleExitScale = 1f
     private var squareExitScale = 1f
 
@@ -75,6 +79,16 @@ class MenuBackdropView(context: Context) : View(context) {
             drawSquare(canvas, 840.963f, 634.128f, 504.256f, 10f)
             canvas.restore()
         }
+        // The small Frame 3 symbols are background decoration: fade them with the outlines.
+        decorationPaint.alpha = outlinePaint.alpha
+        if (decorationPaint.alpha > 0) {
+            canvas.drawBitmap(targetBitmap, null, RectF(136f, 1077f, 193f, 1134f), decorationPaint)
+            canvas.drawBitmap(navigationMarksBitmap, null, RectF(97f, 1258f, 233f, 1382f), decorationPaint)
+            canvas.save()
+            canvas.rotate(-2.6f, 554.699f, 1280.652f)
+            canvas.drawBitmap(warderBitmap, null, RectF(504f, 1229f, 605.398f, 1332.305f), decorationPaint)
+            canvas.restore()
+        }
         canvas.restore()
     }
 
@@ -88,6 +102,12 @@ class MenuBackdropView(context: Context) : View(context) {
 
     private fun farthestCorner(cx: Float, cy: Float, designHeight: Float): Float =
         hypot(max(abs(cx), abs(DESIGN_WIDTH - cx)), max(abs(cy), abs(designHeight - cy)))
+
+    private fun decodeBitmap(resourceId: Int): Bitmap = BitmapFactory.decodeResource(
+        resources,
+        resourceId,
+        BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+    ) ?: error("A Frame 3 decoration bitmap could not be decoded")
 
     companion object { private const val DESIGN_WIDTH = 1080f }
 }

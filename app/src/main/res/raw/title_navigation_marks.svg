@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="136" height="124" viewBox="0 0 136 124" fill="none">
+  <g id="double-diamond">
+    <rect x="106.152" y="7.13843" width="36.6835" height="36.6835"
+          transform="rotate(52.2717 106.152 7.13843)"
+          stroke="#C7C7BC" stroke-width="2" />
+    <rect x="105.426" y="15.5071" width="25.1842" height="25.1842"
+          transform="rotate(52.2717 105.426 15.5071)"
+          stroke="#C7C7BC" stroke-width="5" />
+  </g>
+  <g id="navigation-arrow">
+    <path d="M63.806 64.0101L-4.29333e-05 76.6678L37.6086 123.551L63.806 64.0101Z" fill="#C7C7BC" />
+    <path d="M29.6481 91.4108L-1.81493e-05 76.6678L37.6086 123.551L29.6481 91.4108Z" fill="#EFEFE5" />
+    <path d="M19.356 65.2505L75.4837 54.1292L52.4516 106.508" stroke="#C7C7BC" stroke-width="4" />
+  </g>
+</svg>
