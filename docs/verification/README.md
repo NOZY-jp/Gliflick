@@ -93,3 +93,7 @@ Android 17ではインストール直後のPackageUpdateActivityが起動先を�
 ## 2026-10-30: Figmaタイトルメニュー
 
 詳細は [title-menu-20261030.md](title-menu-20261030.md)。単体72件、実機の全体18件が成功。キャプション除去後はメニュー7件を再確認した。最終版は文字中心固定の1→2倍拡大、不透明度100→0%、420ms。通常時・入力ミス時とも説明文を表示しない。
+
+### 共通判定と図形背景への更新
+
+メニューもGameImeEditTextとWordMatchEngineを使い、armorarmoryとaaaaaの誤字後の継続を修正。単体77件・実機全体20件成功。円弧と正方形をCanvas描画へ移し、方眼を残して拡大・フェードアウトする最終版は実機メニュー10件成功。詳細は [menu-shared-matcher-20261030.md](menu-shared-matcher-20261030.md) と [menu-native-background-20261030.md](menu-native-background-20261030.md)。Git/Jujutsuで変更を分けて記録する。

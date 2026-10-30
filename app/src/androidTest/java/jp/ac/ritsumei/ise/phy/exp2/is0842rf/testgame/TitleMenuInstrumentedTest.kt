@@ -5,6 +5,7 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.os.Build
 import android.os.SystemClock
 import android.text.Spanned
@@ -20,6 +21,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.menu.MenuBackdropView
 
 @RunWith(AndroidJUnit4::class)
 class TitleMenuInstrumentedTest {
@@ -101,6 +103,7 @@ class TitleMenuInstrumentedTest {
             assertEquals("", title.findViewById<AppCompatEditText>(R.id.menuInputHost).text.toString())
             assertEquals(0, highlightedLetters(R.id.menuPlay))
             assertEquals(1f, title.findViewById<TextView>(R.id.menuPlay).alpha)
+            assertEquals(0f, title.findViewById<MenuBackdropView>(R.id.menuBackdrop).transitionProgress)
         }
     }
 
@@ -179,9 +182,40 @@ class TitleMenuInstrumentedTest {
             assertTrue(overlay.alpha > 0f && overlay.alpha < 0.7f)
             assertEquals(centreX, overlay.x + overlay.width / 2f, 0.5f)
             assertEquals(centreY, overlay.y + overlay.height / 2f, 0.5f)
+            assertTrue(title.findViewById<MenuBackdropView>(R.id.menuBackdrop).transitionProgress > 0f)
             captureWindow("menu-transition-pixel7a.png")
         }
         assertDestination("play")
+    }
+
+    @Test fun backgroundOutlinesDisappearWhileTheGridStaysVisible() {
+        instrumentation.runOnMainSync {
+            val backdrop = title.findViewById<MenuBackdropView>(R.id.menuBackdrop)
+            fun render(): Bitmap = Bitmap.createBitmap(backdrop.width, backdrop.height,
+                Bitmap.Config.ARGB_8888).also {
+                it.eraseColor(Color.WHITE)
+                backdrop.draw(Canvas(it))
+            }
+            val initial = render()
+            backdrop.transitionProgress = 1f
+            val cleared = render()
+            val unit = backdrop.width / 1080f
+            val gridX = (46.5f * unit).toInt()
+            val gridY = (100f * unit).toInt()
+            assertEquals(initial.getPixel(gridX, gridY), cleared.getPixel(gridX, gridY))
+            assertNotEquals(Color.WHITE, cleared.getPixel(gridX, gridY))
+            var changed = 0
+            for (y in 0 until backdrop.height step 4) {
+                for (x in 0 until backdrop.width step 4) {
+                    if (initial.getPixel(x, y) != cleared.getPixel(x, y)) changed++
+                }
+            }
+            assertTrue("The independent outlines must disappear", changed > 1000)
+            captureWindow("menu-grid-only-pixel7a.png")
+            backdrop.transitionProgress = 0f
+            initial.recycle()
+            cleared.recycle()
+        }
     }
 
     private fun assertDestination(command: String) {

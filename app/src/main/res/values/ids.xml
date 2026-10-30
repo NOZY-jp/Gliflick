@@ -6,4 +6,5 @@
     <item name="menuUpgrades" type="id" />
     <item name="menuOptions" type="id" />
     <item name="menuSelectionOverlay" type="id" />
+    <item name="menuBackdrop" type="id" />
 </resources>

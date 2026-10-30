@@ -31,6 +31,7 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken
 /** Title interaction shares keyboard transport and recognition with gameplay. */
 class TitleActivity : AppCompatActivity() {
     private lateinit var root: FrameLayout
+    private lateinit var backdrop: MenuBackdropView
     private lateinit var content: TitleMenuView
     private lateinit var viewport: ScrollView
     private lateinit var editor: GameImeEditText
@@ -46,7 +47,8 @@ class TitleActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         root = FrameLayout(this).apply { setBackgroundColor(getColor(R.color.menu_background)) }
-        root.addView(MenuBackdropView(this), fill())
+        backdrop = MenuBackdropView(this)
+        root.addView(backdrop, fill())
         content = TitleMenuView(this)
         viewport = ScrollView(this).apply {
             isFillViewport = true
@@ -170,6 +172,7 @@ class TitleActivity : AppCompatActivity() {
                 word.scaleY = 1f + amount
                 word.alpha = 1f - amount
                 content.alpha = 1f - amount
+                backdrop.transitionProgress = amount
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationCancel(animation: Animator) { cancelled = true }
@@ -224,6 +227,7 @@ class TitleActivity : AppCompatActivity() {
             content.showInput(menuInput)
         }
         content.alpha = 1f
+        backdrop.transitionProgress = 0f
         content.rows.values.forEach { it.alpha = 1f }
         selecting = false
         super.onPause()

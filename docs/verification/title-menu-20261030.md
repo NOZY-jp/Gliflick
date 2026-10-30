@@ -24,7 +24,7 @@
 - `menu-pl-pixel7a.png`: only `pl` is darkened.
 - `menu-transition-pixel7a.png`: intermediate enlargement/fade with its centre preserved.
 
-These three PNGs are native app-window renders from the physical device, taken with `decorView.draw(Canvas)`. They deliberately exclude the system keyboard, lock screen and other apps. Background is visible throughout the app window, including the area behind the IME. The bundled Figma background file is nonempty, 1080×2040, and is drawn at its original aspect ratio.
+These three PNGs are native app-window renders from the physical device, taken with `decorView.draw(Canvas)`. They deliberately exclude the system keyboard, lock screen and other apps. Background is visible throughout the app window, including the area behind the IME. They have been refreshed for the native-shape background revision; see `menu-native-background-20261030.md`.
 
 This is automated UI/input-notification verification. It is not new human Simeji typing evidence. Polymath Display was not supplied; Android system sans-serif fonts approximate it.
 
@@ -32,4 +32,4 @@ The first test run exposed a consumed ActivityMonitor in the multi-navigation fi
 
 ## Memory synchronization
 
-The local vault `E:\home\wiki` and configured share `\\100.104.189.113\e\home\wiki` could not be accessed. Project decisions and requested visual constraints are saved in `docs/TitleMenuDesign.md` and the active `AGENTS.md`; wiki synchronization and wiki validation remain pending connectivity.
+The share became reachable during the following input/background work. Current decisions and verification are synchronized into the Glyphica Android project note and the 2026-10-30 session in LLMwiki.

@@ -1,10 +1,6 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.menu
 
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.SpannableString
 import android.text.Spanned
@@ -19,32 +15,6 @@ import androidx.core.content.ContextCompat
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.R
 import kotlin.math.ceil
 import kotlin.math.max
-
-/** The original Figma background, at its natural aspect ratio, extends behind the keyboard. */
-class MenuBackdropView(context: Context) : View(context) {
-    private val bitmap = BitmapFactory.decodeResource(resources, R.drawable.menu_backdrop)
-    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private val gridPaint = Paint().apply { color = context.getColor(R.color.menu_grid) }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val unit = width / bitmap.width.toFloat()
-        val bottom = bitmap.height * unit
-        canvas.drawBitmap(bitmap, null, RectF(0f, 0f, width.toFloat(), bottom), bitmapPaint)
-        // Taller displays continue the grid without stretching the exported geometry.
-        if (height > bottom) {
-            gridPaint.strokeWidth = 3f * unit
-            for (x in 46..bitmap.width step 198) {
-                canvas.drawLine(x * unit, bottom, x * unit, height.toFloat(), gridPaint)
-            }
-            var y = 213f + ceil((bitmap.height - 213f) / 198f) * 198f
-            while (y * unit < height) {
-                canvas.drawLine(0f, y * unit, width.toFloat(), y * unit, gridPaint)
-                y += 198f
-            }
-        }
-    }
-}
 
 /** Width-based Figma proportions with native text, full-row buttons and a scrollable small-screen fallback. */
 class TitleMenuView(context: Context) : FrameLayout(context) {
