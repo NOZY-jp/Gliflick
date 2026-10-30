@@ -2,6 +2,7 @@ package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat
 
 import kotlin.random.Random
 import kotlin.math.atan2
+import kotlin.math.roundToInt
 
 data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExperience: Int = 50,
                                  val experienceIncreasePerLevel: Int = 20) {
@@ -114,7 +115,7 @@ class CombatWorld(
         spawnPolicy.onBossDefeated(bossesDefeated)
     }
 
-    fun update(dt: Float) {
+    fun update(dt: Float, weaponModifiers: WeaponRuntimeModifiers = WeaponRuntimeModifiers()) {
         require(dt >= 0f && dt.isFinite())
         if (width == 0f) return
         mutableBursts.forEach { it.advance(dt) }
@@ -132,9 +133,9 @@ class CombatWorld(
                 die(enemy, awardExperience = false)
             }
         }
-        val actions = mainWeapon.update(dt, player.position) { id ->
+        val actions = mainWeapon.update(dt, player.position, { id ->
             mutableEnemies.firstOrNull { it.id == id && it.isAlive }?.position
-        }
+        }, weaponModifiers)
         actions.forEach { action -> when (action) {
             is WeaponAction.LaunchProjectile -> mutableProjectiles += action.projectile
         } }
@@ -152,7 +153,11 @@ class CombatWorld(
                 projectile.position = impactPosition
                 val enemyPositionAtImpact = hit.first.previousPosition +
                     (hit.first.position - hit.first.previousPosition) * hit.second
-                val applied = hit.first.takeDamage(projectile.damage)
+                val isCritical = projectile.criticalChance > 0f && random.nextFloat() < projectile.criticalChance
+                val shotDamage = if (isCritical)
+                    (projectile.damage * projectile.criticalDamageMultiplier).roundToInt()
+                else projectile.damage
+                val applied = hit.first.takeDamage(shotDamage)
                 if (applied > 0) {
                     val incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x)
                     mutableHitFeedback += HitFeedback(enemyPositionAtImpact, applied,

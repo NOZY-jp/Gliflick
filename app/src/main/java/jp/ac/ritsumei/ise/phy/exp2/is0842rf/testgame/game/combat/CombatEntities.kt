@@ -137,8 +137,14 @@ class Projectile(
     var position: Vec2,
     var velocity: Vec2,
     val damage: Int = 35,
-    val radius: Float = 1.25f
+    val radius: Float = 1.25f,
+    val criticalChance: Float = 0f,
+    val criticalDamageMultiplier: Float = 1.5f
 ) {
+    init {
+        require(damage >= 0 && radius > 0f)
+        require(criticalChance in 0f..1f && criticalDamageMultiplier >= 1f)
+    }
     var previousPosition = position
     var age = 0f
         private set
@@ -149,16 +155,33 @@ class Projectile(
     }
 }
 
-data class ProjectileDefinition(val damage: Int = 35, val speed: Float = 520f, val radius: Float = 1.25f) {
+data class ProjectileDefinition(
+    val damage: Int = 35,
+    val speed: Float = 520f,
+    val radius: Float = 1.25f
+) {
     init { require(damage >= 0 && speed > 0f && radius > 0f) }
 }
 data class RepeaterDefinition(val burstCount: Int = 3, val shotInterval: Float = 0.12f,
-                              val burstInterval: Float = 0.16f, val projectile: ProjectileDefinition = ProjectileDefinition()) {
-    init { require(burstCount > 0 && shotInterval > 0f && burstInterval > 0f) }
+                              val burstInterval: Float = 0.16f, val projectile: ProjectileDefinition = ProjectileDefinition(),
+                              val criticalChance: Float = 0.05f, val criticalDamageMultiplier: Float = 1.5f) {
+    init {
+        require(burstCount > 0 && shotInterval > 0f && burstInterval > 0f)
+        require(criticalChance in 0f..1f && criticalDamageMultiplier >= 1f)
+    }
 }
 
 sealed interface WeaponAction {
     data class LaunchProjectile(val projectile: Projectile) : WeaponAction
+}
+
+/** Shared runtime modifiers let each weapon decide how its own firing pattern responds. */
+data class WeaponRuntimeModifiers(
+    val criticalChanceBonus: Float = 0f,
+    val rateOfFireMultiplier: Float = 1f
+) {
+    init { require(criticalChanceBonus >= 0f && criticalChanceBonus.isFinite() &&
+        rateOfFireMultiplier > 0f && rateOfFireMultiplier.isFinite()) }
 }
 
 /** Input and simulation depend on this contract, never a concrete weapon's firing algorithm. */
@@ -168,6 +191,8 @@ interface MainWeapon {
     fun targetDied(enemyId: Long, position: Vec2)
     fun resize(xScale: Float, yScale: Float)
     fun update(dt: Float, origin: Vec2, resolve: (Long) -> Vec2?): List<WeaponAction>
+    fun update(dt: Float, origin: Vec2, resolve: (Long) -> Vec2?, modifiers: WeaponRuntimeModifiers): List<WeaponAction> =
+        update(dt, origin, resolve)
 }
 
 /** Scheduling survives target death; aim is frozen separately for every emitted projectile. */
@@ -184,7 +209,15 @@ class Repeater(val definition: RepeaterDefinition = RepeaterDefinition()) : Main
     override fun resize(xScale: Float, yScale: Float) {
         bursts.forEach { it.lastAim = it.lastAim.scaled(xScale, yScale) }
     }
-    override fun update(dt: Float, origin: Vec2, resolve: (Long) -> Vec2?): List<WeaponAction> {
+    override fun update(dt: Float, origin: Vec2, resolve: (Long) -> Vec2?): List<WeaponAction> =
+        update(dt, origin, resolve, WeaponRuntimeModifiers())
+
+    override fun update(
+        dt: Float,
+        origin: Vec2,
+        resolve: (Long) -> Vec2?,
+        modifiers: WeaponRuntimeModifiers
+    ): List<WeaponAction> {
         cooldown -= dt
         val emitted = mutableListOf<WeaponAction>()
         while (bursts.isNotEmpty() && cooldown <= 0f) {
@@ -192,10 +225,18 @@ class Repeater(val definition: RepeaterDefinition = RepeaterDefinition()) : Main
             resolve(burst.enemyId)?.let { burst.lastAim = it }
             val direction = (burst.lastAim - origin).normalized()
             val bullet = definition.projectile
-            emitted += WeaponAction.LaunchProjectile(Projectile(origin, direction * bullet.speed, bullet.damage, bullet.radius))
+            emitted += WeaponAction.LaunchProjectile(Projectile(
+                position = origin,
+                velocity = direction * bullet.speed,
+                damage = bullet.damage,
+                radius = bullet.radius,
+                criticalChance = (definition.criticalChance + modifiers.criticalChanceBonus).coerceAtMost(1f),
+                criticalDamageMultiplier = definition.criticalDamageMultiplier
+            ))
             burst.remaining--
             if (burst.remaining == 0) bursts.removeFirst()
-            cooldown += if (burst.remaining == 0) definition.burstInterval else definition.shotInterval
+            val interval = if (burst.remaining == 0) definition.burstInterval else definition.shotInterval
+            cooldown += interval / modifiers.rateOfFireMultiplier
         }
         if (bursts.isEmpty()) cooldown = cooldown.coerceAtLeast(0f)
         return emitted

@@ -27,10 +27,12 @@ class CombatSession(
     private val definitions: List<WordDefinition>,
     val world: CombatWorld = CombatWorld(),
     private val random: Random = Random.Default,
-    private val wordLengthPolicy: WordLengthPolicy = ProgressiveGaussianWordLengthPolicy()
+    private val wordLengthPolicy: WordLengthPolicy = ProgressiveGaussianWordLengthPolicy(),
+    private val typingBonusDefinition: CombatTypingBonusDefinition = CombatTypingBonusDefinition()
 ) {
     private val playableDefinitions = definitions.filter { it.readingLength in 2..7 }
     private val engine = WordMatchEngine(emptyList())
+    private val typingBonuses = CombatTypingBonusTracker(typingBonusDefinition)
     private val mutableCaptions = mutableListOf<EnemyCaption>()
     private val mutableCompletions = mutableListOf<CompletedCaption>()
     private var wordVersion = 0L
@@ -38,6 +40,7 @@ class CombatSession(
     val captions: List<EnemyCaption> get() = mutableCaptions
     val completions: List<CompletedCaption> get() = mutableCompletions
     val streak get() = engine.streak
+    val isWordRushActive get() = typingBonuses.isWordRushActiveAt(world.elapsedSeconds)
     val mistypeCount get() = engine.mistypeCount
     var overlapEvents: List<OverlapEvent> = emptyList()
         private set
@@ -56,7 +59,7 @@ class CombatSession(
     }
 
     fun update(dt: Float) {
-        world.update(dt)
+        world.update(dt, typingBonuses.modifiers(engine.streak, world.elapsedSeconds))
         syncEvents()
         mutableCaptions.forEach { caption ->
             caption.age += dt
@@ -79,10 +82,15 @@ class CombatSession(
         if (apply) {
             pendingTokens = emptyList()
             tokens.forEach { token ->
+                val previousMistypeCount = engine.mistypeCount
                 val completed = engine.accept(token)
+                if (engine.mistypeCount > previousMistypeCount) typingBonuses.onMistype()
                 overlaps += engine.lastOverlapEvents
                 completed.forEach { word ->
                     completedAny = true
+                    if (mutableCaptions.any { it.word.id == word.id && !it.retired }) {
+                        typingBonuses.onWordCompleted(word.readingLength, world.elapsedSeconds)
+                    }
                     complete(word.id)
                 }
             }
