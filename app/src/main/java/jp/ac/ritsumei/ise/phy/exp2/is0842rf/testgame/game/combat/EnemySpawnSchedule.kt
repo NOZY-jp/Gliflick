@@ -16,11 +16,12 @@ data class WaveSpawnParameters(
     val gentleWavePeriodSeconds: Double = 120.0,
     val burstPeriodSeconds: Double = 5.0,
     val burstTimingJitterSeconds: Double = 0.3,
-    val averageBurstCount: Double = 3.0,
+    val burstChancePerPulse: Double = 0.45,
+    val averageBurstCount: Double = 1.5,
     val maximumBurstCount: Int = 8,
-    val trickleRatePerSecond: Double = 0.15,
-    val levelGrowthPerLevel: Double = 0.08,
-    val maximumLevelMultiplier: Double = 2.0,
+    val trickleRatePerSecond: Double = 0.18,
+    val levelGrowthPerLevel: Double = 0.04,
+    val maximumLevelMultiplier: Double = 1.4,
     val minimumWaveMultiplier: Double = 0.75,
     val maximumWaveMultiplier: Double = 1.25
 ) {
@@ -28,6 +29,7 @@ data class WaveSpawnParameters(
         require(firstBurstAtSeconds > 0.0 && firstTrickleAtSeconds >= 0.0)
         require(gentleWavePeriodSeconds > 0.0 && burstPeriodSeconds > 0.0)
         require(burstTimingJitterSeconds >= 0.0 && burstTimingJitterSeconds < burstPeriodSeconds)
+        require(burstChancePerPulse in 0.0..1.0)
         require(averageBurstCount > 0.0 && maximumBurstCount > 0)
         require(trickleRatePerSecond >= 0.0 && levelGrowthPerLevel >= 0.0)
         require(maximumLevelMultiplier >= 1.0)
@@ -51,8 +53,10 @@ class CompositeWaveSpawnSchedule(
         var crossedBurst = false
 
         while (elapsedSeconds >= nextBurstAtSeconds) {
-            val multiplier = waveMultiplier(nextBurstAtSeconds) * levelMultiplier(playerLevel)
-            requested += samplePoisson(parameters.averageBurstCount * multiplier, random)
+            if (random.nextDouble() < parameters.burstChancePerPulse) {
+                val multiplier = waveMultiplier(nextBurstAtSeconds) * levelMultiplier(playerLevel)
+                requested += samplePoisson(parameters.averageBurstCount * multiplier, random)
+            }
             crossedBurst = true
             val jitter = if (parameters.burstTimingJitterSeconds == 0.0) 0.0 else
                 random.nextDouble(-parameters.burstTimingJitterSeconds, parameters.burstTimingJitterSeconds)
