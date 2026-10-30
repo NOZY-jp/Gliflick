@@ -1,8 +1,11 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.menu
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.view.View
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.R
 import kotlin.math.abs
@@ -10,7 +13,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** Independent native outlines, using the geometry exported from Figma node 4:6. */
+/** A rasterized Figma grid under two independently animated native outline groups. */
 class MenuBackdropView(context: Context) : View(context) {
     var transitionProgress: Float = 0f
         set(value) {
@@ -18,9 +21,13 @@ class MenuBackdropView(context: Context) : View(context) {
             invalidate()
         }
 
-    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val gridBitmap: Bitmap = BitmapFactory.decodeResource(
+        resources,
+        R.drawable.menu_grid,
+        BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ALPHA_8 }
+    ) ?: error("The title grid PNG could not be decoded")
+    private val gridPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
         color = context.getColor(R.color.menu_grid)
-        strokeWidth = 3f
     }
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = context.getColor(R.color.menu_grid)
@@ -45,20 +52,10 @@ class MenuBackdropView(context: Context) : View(context) {
         super.onDraw(canvas)
         if (width == 0) return
         val unit = width / DESIGN_WIDTH
-        val designHeight = height / unit
         canvas.save()
         canvas.scale(unit, unit)
-
-        var x = 46.5f
-        while (x < DESIGN_WIDTH) {
-            canvas.drawLine(x, 0f, x, designHeight, gridPaint)
-            x += 198f
-        }
-        var y = 212.5f
-        while (y < designHeight) {
-            canvas.drawLine(0f, y, DESIGN_WIDTH, y, gridPaint)
-            y += 198f
-        }
+        canvas.drawBitmap(gridBitmap, null,
+            RectF(0f, 0f, DESIGN_WIDTH, gridBitmap.height.toFloat()), gridPaint)
 
         outlinePaint.alpha = (255f * (1f - transitionProgress)).roundToInt()
         if (outlinePaint.alpha > 0) {

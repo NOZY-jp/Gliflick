@@ -97,3 +97,7 @@ Android 17ではインストール直後のPackageUpdateActivityが起動先を�
 ### 共通判定と図形背景への更新
 
 メニューもGameImeEditTextとWordMatchEngineを使い、armorarmoryとaaaaaの誤字後の継続を修正。単体77件・実機全体20件成功。円弧と正方形をCanvas描画へ移し、方眼を残して拡大・フェードアウトする最終版は実機メニュー10件成功。詳細は [menu-shared-matcher-20261030.md](menu-shared-matcher-20261030.md) と [menu-native-background-20261030.md](menu-native-background-20261030.md)。Git/Jujutsuで変更を分けて記録する。
+
+### 改訂Figmaフレーム14:97
+
+タップ入力間隔を50msに短縮し、Figma座標に合わせてステータスバー分のずれを解消。方眼PNGをフレーム14:98から更新し、IME非表示時の `Launch IME` ボタンを追加。Pixel 7aで配置、ボタンの表示／IME再表示を手動確認。今回、自動テストと新しい人の実打鍵は実施していない。詳細は [title-menu-figma14-20261030.md](title-menu-figma14-20261030.md)。

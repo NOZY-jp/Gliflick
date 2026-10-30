@@ -1,0 +1,36 @@
+<svg width="1080" height="2040" viewBox="0 0 1080 2040" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1080" height="2040" fill="#F5F5F5"/>
+<g id="Frame 3" clip-path="url(#clip0_0_1)">
+<rect width="1080" height="2040" fill="white"/>
+<g id="Frame 3_2" clip-path="url(#clip1_0_1)">
+<line id="Line 1" y1="212.5" x2="1080" y2="212.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 2" y1="410.5" x2="1080" y2="410.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 3" y1="608.5" x2="1080" y2="608.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 4" y1="806.5" x2="1080" y2="806.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 5" y1="1004.5" x2="1080" y2="1004.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 6" y1="1202.5" x2="1080" y2="1202.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 7" y1="1400.5" x2="1080" y2="1400.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 8" y1="1598.5" x2="1080" y2="1598.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 16" y1="1794.5" x2="1080" y2="1794.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 17" y1="1990.5" x2="1080" y2="1990.5" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 10" x1="1036.5" y1="6.11007e-05" x2="1036.5" y2="2040" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 11" x1="838.5" y1="3.05831e-05" x2="838.5" y2="2040" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 12" x1="640.5" y1="3.05831e-05" x2="640.5" y2="2040" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 13" x1="442.5" y1="3.05831e-05" x2="442.5" y2="2040" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 14" x1="244.5" y1="3.05831e-05" x2="244.5" y2="2040" stroke="#F3F3F3" stroke-width="3"/>
+<line id="Line 15" x1="46.5" y1="6.55671e-08" x2="46.4999" y2="2040" stroke="#F3F3F3" stroke-width="3"/>
+<circle id="Ellipse 2" cx="1208" cy="-169" r="1041.5" stroke="#F3F3F3" stroke-width="35"/>
+<circle id="Ellipse 3" cx="1208" cy="-169" r="983" stroke="#F3F3F3" stroke-width="12"/>
+<rect id="Rectangle 1" x="834.642" y="581.779" width="578.212" height="578.212" transform="rotate(38.4896 834.642 581.779)" stroke="#F3F3F3" stroke-width="31"/>
+<rect id="Rectangle 2" x="840.963" y="634.128" width="504.256" height="504.256" transform="rotate(38.4896 840.963 634.128)" stroke="#F3F3F3" stroke-width="10"/>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_0_1">
+<rect width="1080" height="2040" fill="white"/>
+</clipPath>
+<clipPath id="clip1_0_1">
+<rect width="1080" height="2040" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -5,6 +5,7 @@
     <item name="menuArmory" type="id" />
     <item name="menuUpgrades" type="id" />
     <item name="menuOptions" type="id" />
+    <item name="menuLaunchIme" type="id" />
     <item name="menuSelectionOverlay" type="id" />
     <item name="menuBackdrop" type="id" />
 </resources>

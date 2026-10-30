@@ -77,7 +77,7 @@ class TitleMenuInstrumentedTest {
         }
     }
 
-    @Test fun tapTypesAtOneHundredMillisecondIntervalsAndIgnoresDuplicateSelection() {
+    @Test fun tapTypingShowsProgressAndIgnoresDuplicateSelection() {
         instrumentation.runOnMainSync { title.findViewById<TextView>(R.id.menuOptions).performClick() }
         waitUntil { highlightedLetters(R.id.menuOptions) == 1 }
         instrumentation.runOnMainSync {

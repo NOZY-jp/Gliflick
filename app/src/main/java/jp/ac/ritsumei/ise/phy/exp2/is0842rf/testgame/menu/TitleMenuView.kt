@@ -19,6 +19,7 @@ import kotlin.math.max
 /** Width-based Figma proportions with native text, full-row buttons and a scrollable small-screen fallback. */
 class TitleMenuView(context: Context) : FrameLayout(context) {
     var onCommandClick: ((MenuCommand) -> Unit)? = null
+    var onLaunchImeClick: (() -> Unit)? = null
     private val ink = context.getColor(R.color.menu_ink)
     private val untyped = context.getColor(R.color.menu_untyped)
     private val density = resources.displayMetrics.density
@@ -56,11 +57,33 @@ class TitleMenuView(context: Context) : FrameLayout(context) {
             }
         }
     }
+    val launchIme = TextView(context).apply {
+        id = R.id.menuLaunchIme
+        text = context.getString(R.string.menu_launch_ime)
+        setTextColor(ink)
+        gravity = Gravity.CENTER
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        letterSpacing = 0.02f
+        includeFontPadding = false
+        isFocusable = true
+        accessibilityDelegate = object : AccessibilityDelegate() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info.className = "android.widget.Button"
+            }
+        }
+        setOnClickListener { onLaunchImeClick?.invoke() }
+    }
     init {
         id = R.id.menuContent
         addView(title)
         rows.values.forEach(::addView)
+        addView(launchIme)
         showInput(MenuInputController().currentInput())
+    }
+
+    fun setImeVisible(visible: Boolean) {
+        launchIme.visibility = if (visible) View.GONE else View.VISIBLE
     }
 
     fun showInput(input: MenuInput) {
@@ -80,26 +103,29 @@ class TitleMenuView(context: Context) : FrameLayout(context) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
         val unit = w / 1080f
         val fontScale = resources.configuration.fontScale
-        val rowHeight = max(114f * unit, 48f * density * fontScale)
-        val contentHeight = max(1120f * unit, 526f * unit + rowHeight * 4 + 16f * density)
+        val rowHeight = max(108f * unit, 48f * density * fontScale)
+        val contentHeight = 2040f * unit
         setMeasuredDimension(w, resolveSize(ceil(contentHeight).toInt(), heightMeasureSpec))
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, 148f * unit)
         title.measure(exact(904f * unit), exact(231f * unit))
         rows.values.forEach { row ->
             // Long labels still fit at large accessibility font sizes.
             row.setTextSize(TypedValue.COMPLEX_UNIT_PX, 90f * unit * fontScale.coerceAtMost(1.5f))
-            row.measure(exact(838f * unit), exact(rowHeight))
+            row.measure(exact(768f * unit), exact(rowHeight))
         }
+        launchIme.setTextSize(TypedValue.COMPLEX_UNIT_PX, 90f * unit * fontScale.coerceAtMost(1.5f))
+        launchIme.measure(exact(498f * unit), exact(315f * unit))
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val unit = width / 1080f
         title.place(88f * unit, 191f * unit)
-        var rowTop = 526f * unit
+        var rowTop = 531f * unit
         rows.values.forEach { row ->
             row.place(121f * unit, rowTop)
             rowTop += row.measuredHeight
         }
+        launchIme.place(291f * unit, 1608f * unit)
     }
 
     private fun exact(size: Float) = MeasureSpec.makeMeasureSpec(size.toInt(), MeasureSpec.EXACTLY)

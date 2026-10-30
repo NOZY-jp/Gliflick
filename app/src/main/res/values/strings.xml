@@ -10,6 +10,7 @@
     <string name="mistype_count">ミス: %1$d</string>
     <string name="mistype_initial">ミス: 0</string>
     <string name="menu_title">Glyflick</string>
+    <string name="menu_launch_ime">Launch IME</string>
     <string name="menu_input_accessibility">メニュー名を英字で入力</string>
     <string name="keyboard_input_from_menu">%1$s → 入力テスト</string>
 </resources>

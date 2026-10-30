@@ -77,6 +77,7 @@ class TitleActivity : AppCompatActivity() {
         content.onCommandClick = { command ->
             if (!selecting) startTap(command)
         }
+        content.onLaunchImeClick = { requestMenuInput() }
         editor.onGameInput = { edit ->
             if (selecting) false
             else {
@@ -98,7 +99,10 @@ class TitleActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())
-            viewport.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
+            // Figma coordinates start at the screen edge; keeping a status-bar top inset
+            // here shifts the whole composition down by the height of the status bar.
+            viewport.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, keyboard.bottom))
+            content.setImeVisible(keyboard.bottom > bars.bottom)
             insets
         }
         WindowInsetsControllerCompat(window, root).isAppearanceLightStatusBars = true
@@ -241,7 +245,7 @@ class TitleActivity : AppCompatActivity() {
     private fun fill() = FrameLayout.LayoutParams(-1, -1)
 
     companion object {
-        const val TYPE_INTERVAL_MS = 100L
+        const val TYPE_INTERVAL_MS = 50L
         const val ZOOM_DURATION_MS = 420L
     }
 }
