@@ -6,6 +6,7 @@ import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.View
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.CombatSession
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.UpgradeLayout
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordDefinition
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.render.CombatRenderer
 import kotlin.math.min
@@ -16,6 +17,8 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
         private set
     var onInputRequested: (() -> Unit)? = null
     var onRestart: (() -> Unit)? = null
+    var onInputBoundary: (() -> Unit)? = null
+    private var observedInputEpoch = 0
     private val renderer = CombatRenderer(context)
     private var running = false
     private var lastFrame = 0L
@@ -43,9 +46,17 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
         if (lastFrame != 0L) accumulator += ((frameTimeNanos - lastFrame) / 1_000_000_000f).coerceIn(0f, 0.1f)
         lastFrame = frameTimeNanos
         while (accumulator >= STEP) { session.update(STEP); accumulator -= STEP }
+        syncInputBoundary()
         accessibilityClock += STEP
         if (accessibilityClock >= 0.5f) {
             accessibilityClock = 0f
+            val selection = session.upgradeSelection
+            if (selection != null) contentDescription = "レベル" + selection.level + " " +
+                selection.offers.mapIndexed { index, offer ->
+                    offer.kind.title + " " + offer.weapon.title + " " + offer.description +
+                        " 選択語 " + selection.states[index].inputText
+                }.joinToString("、") + "、リロール残り" + session.rerollsRemaining
+            else
             contentDescription = "リピーター レベル${session.world.level} HP${session.world.player.hp} " +
                 session.captions.filter { !it.retired }.joinToString("、") { it.state.inputText }
         }
@@ -69,7 +80,16 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_UP) performClick()
+        if (event.action == MotionEvent.ACTION_UP) {
+            session.upgradeSelection?.let { selection ->
+                val layout = UpgradeLayout(width / unit, height / unit, selection.offers.size)
+                val x = event.x / unit; val y = event.y / unit
+                if (layout.reroll.contains(x, y)) session.rerollUpgrades()
+                else layout.hitChoice(x, y)?.let(session::tapUpgrade)
+                syncInputBoundary()
+            }
+            performClick()
+        }
         return true
     }
 
@@ -77,6 +97,7 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
         super.performClick()
         if (session.world.isGameOver) {
             session = CombatSession(definitions)
+            observedInputEpoch = 0
             session.resize(width / unit, height / unit)
             onRestart?.invoke()
         }
@@ -85,5 +106,11 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
     }
 
     override fun onDetachedFromWindow() { stop(); super.onDetachedFromWindow() }
+    private fun syncInputBoundary() {
+        if (observedInputEpoch != session.inputEpoch) {
+            observedInputEpoch = session.inputEpoch
+            onInputBoundary?.invoke()
+        }
+    }
     companion object { private const val STEP = 1f / 120f }
 }

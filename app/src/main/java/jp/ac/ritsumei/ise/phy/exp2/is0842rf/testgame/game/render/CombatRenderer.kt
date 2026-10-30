@@ -28,6 +28,8 @@ import kotlin.math.min
 
 /** Presentation only: no matching, damage, spawning, or weapon timing. Coordinates are logical dp. */
 class CombatRenderer(context: Context) {
+    private val secondaryRenderer = SecondaryWeaponRenderer()
+    private val upgradeRenderer = UpgradeRenderer()
     private val gridBackground = GridBackgroundRenderer(context)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ink = Color.rgb(70, 70, 70)
@@ -52,6 +54,7 @@ class CombatRenderer(context: Context) {
         canvas.drawRect(0f, 0f, width, height, paint)
         paint.shader = null
         gridBackground.draw(canvas, width)
+        secondaryRenderer.draw(canvas, world)
 
         world.deathBursts.forEach { burst -> burst.particles.forEach { particle ->
             val size = particle.sizeAt(burst.age)
@@ -95,9 +98,14 @@ class CombatRenderer(context: Context) {
             val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
             drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy, it.radius)
         }
+        session.pickupCaptions.forEach {
+            drawCaption(canvas, it.state, it.pickup.position, 1f, 1f, width, false, 9f)
+        }
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
         drawTypingBonuses(canvas, session, width)
+        secondaryRenderer.drawArsenal(canvas, world, width, height)
+        upgradeRenderer.draw(canvas, session, width, height)
         if (world.isGameOver) {
             paint.color = Color.argb(200, 239, 239, 229)
             canvas.drawRect(0f, 0f, width, height, paint)

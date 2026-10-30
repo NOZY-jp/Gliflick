@@ -8,6 +8,8 @@ import android.view.inputmethod.EditorInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.Repeater
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.EnemyDefinition
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.Vec2
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.TypingLanguages
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.splitTextCharacters
 import org.junit.Assert.*
@@ -24,6 +26,7 @@ class CombatInstrumentedTest {
         val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, CombatActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as CombatActivity
         try {
+            seedEnemy(activity)
             waitUntil { activity.hasWindowFocus() && activity.findViewById<CombatView>(R.id.combatArena).session.captions.isNotEmpty() }
             instrumentation.runOnMainSync {
                 capture(activity, "combat-hud-final.png")
@@ -92,6 +95,7 @@ class CombatInstrumentedTest {
         val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, CombatActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as CombatActivity
         try {
+            seedEnemy(activity)
             waitUntil { activity.hasWindowFocus() && activity.findViewById<CombatView>(R.id.combatArena).session.captions.isNotEmpty() }
             instrumentation.runOnMainSync {
                 val arena = activity.findViewById<CombatView>(R.id.combatArena)
@@ -107,6 +111,14 @@ class CombatInstrumentedTest {
                 assertEquals("", editor.text.toString())
             }
         } finally { instrumentation.runOnMainSync { activity.finish() } }
+    }
+
+    private fun seedEnemy(activity: CombatActivity) {
+        waitUntil { activity.hasWindowFocus() && activity.findViewById<CombatView>(R.id.combatArena).session.world.width > 0f }
+        instrumentation.runOnMainSync {
+            val world = activity.findViewById<CombatView>(R.id.combatArena).session.world
+            world.spawnEnemy(Vec2(world.player.position.x, -12f), EnemyDefinition(speed = 0f))
+        }
     }
 
     private fun capture(activity: CombatActivity, name: String) {

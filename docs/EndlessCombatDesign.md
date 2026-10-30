@@ -1,10 +1,10 @@
 # Repeater endless combat
 
-2026-10-30. Implements the user's play-screen reference and normal drones only.
+2026-10-30. Repeater endless combat, Drone enemies, level-up choices and eleven secondary weapons.
 
 ## Goal
 
-Play opens combat immediately. A fixed central player, elapsed timer, level, linear and circular XP, and HP form the HUD. The lower weapon UI is deferred. Drones approach at constant speed; typing a caption queues a three-shot Repeater burst and replaces that caption.
+Play opens combat immediately. A fixed central player, elapsed timer, level, linear and circular XP, HP and five weapon slots form the HUD. Drones approach at constant speed; typing a caption queues a Repeater burst and replaces that caption. Level-up pauses combat for three upgrade/new-weapon choices. See [LevelUpDesign.md](LevelUpDesign.md) for researched effects, prototype tuning and extension contracts.
 
 ## Structure
 
@@ -116,7 +116,7 @@ The official [Update 12 announcement](https://steamcommunity.com/app/2400160/ann
 | Enemy count / spawn | Random single arrivals; 0.45/s base rate modulated 0.8×–1.2× over 120s; 16 alive maximum | Rate cloud, level multiplier, and cap are local tuning; there are no groups or interval timer. |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |
 
-The default HP80 / damage35 requires three ordinary hits. A test injects damage40 to verify the user's two-hit-kill example still emits its third projectile. Critical hits and typing bonuses are implemented; bleed and weapon upgrades remain deferred. The [lead developer's explanation](https://steamcommunity.com/app/2400160/discussions/0/591784375625107988/) confirms that the base Repeater has no range stat; bullets therefore leave only on contact or exiting the arena. Level changes update the HUD without weapon upgrades. Contact consumes a drone; HP0 stops combat and offers a tap to restart.
+The default HP80 / damage35 requires three ordinary hits. A test injects damage40 to verify the user's two-hit-kill example still emits its third projectile. Critical hits, typing bonuses, damage statuses, level-up choices and weapon upgrades are implemented. The [lead developer's explanation](https://steamcommunity.com/app/2400160/discussions/0/591784375625107988/) confirms that the base Repeater has no range stat; bullets therefore leave only on contact or exiting the arena. Explosion-range upgrades appear only after Exploding Bullets. Contact consumes a drone; HP0 stops combat and offers a tap to restart.
 
 ## Verification
 

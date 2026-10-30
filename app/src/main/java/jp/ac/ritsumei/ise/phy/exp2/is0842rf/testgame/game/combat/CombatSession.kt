@@ -22,6 +22,8 @@ class CompletedCaption(val state: WordMatchState, var anchor: Vec2, val placeBel
     val progress get() = (age / 0.42f).coerceIn(0f, 1f)
 }
 
+class PickupCaption(val pickup: CombatPickup, val word: WordDefinition, var state: WordMatchState)
+
 /** Bridges word lifetimes and physical lifetimes without turning a completed word into a kill. */
 class CombatSession(
     private val definitions: List<WordDefinition>,
@@ -35,10 +37,21 @@ class CombatSession(
     private val typingBonuses = CombatTypingBonusTracker(typingBonusDefinition)
     private val mutableCaptions = mutableListOf<EnemyCaption>()
     private val mutableCompletions = mutableListOf<CompletedCaption>()
+    private val mutablePickupCaptions = mutableListOf<PickupCaption>()
     private var wordVersion = 0L
     private var pendingTokens: List<InputToken> = emptyList()
     val captions: List<EnemyCaption> get() = mutableCaptions
     val completions: List<CompletedCaption> get() = mutableCompletions
+    val pickupCaptions: List<PickupCaption> get() = mutablePickupCaptions
+    var upgradeSelection: UpgradeSelection? = null; private set
+    var rerollsRemaining = 4; private set
+    val canRerollUpgrades get() = upgradeSelection?.let { selection ->
+        rerollsRemaining > 0 && !selection.isChoosing && (!selection.evolution ||
+            ((world.mainWeapon as? Repeater)?.upgrades?.let { state ->
+                RepeaterEvolution.entries.count { state.rank(it) < 2 }
+            } ?: 0) > selection.offers.size)
+    } ?: false
+    var inputEpoch = 0; private set
     val streak get() = engine.streak
     val isWordRushActive get() = typingBonuses.isWordRushActiveAt(world.elapsedSeconds)
     val typingBonusStatus get() = typingBonuses.status(engine.streak, world.elapsedSeconds)
@@ -60,6 +73,15 @@ class CombatSession(
     }
 
     fun update(dt: Float) {
+        upgradeSelection?.let { selection ->
+            selection.advance(dt)?.let { offer ->
+                check(world.applyUpgrade(offer)) { "An offered upgrade must still be applicable." }
+                upgradeSelection = null
+                inputEpoch++
+                openPendingReward()
+            }
+            return
+        }
         world.update(dt, typingBonuses.modifiers(engine.streak, world.elapsedSeconds))
         syncEvents()
         mutableCaptions.forEach { caption ->
@@ -71,10 +93,52 @@ class CombatSession(
         mutableCaptions.removeAll { (it.fadeAge ?: 0f) >= CombatWorld.DEATH_FADE_SECONDS }
         mutableCompletions.forEach { it.age += dt }
         mutableCompletions.removeAll { it.progress >= 1f }
+        openPendingReward()
     }
+
+    private fun openPendingReward() {
+        if (world.isGameOver || upgradeSelection != null) return
+        val evolution = (world.mainWeapon as? Repeater)?.upgrades?.canEvolve == true
+        if (!evolution && !world.consumeLevelUp()) return
+        showReward(evolution)
+    }
+
+    private fun showReward(evolution: Boolean) {
+        val offers = UpgradeCatalog.roll(world, random, evolution)
+        if (offers.isEmpty()) return
+        val words = mutableListOf<WordDefinition>()
+        playableDefinitions.filter { it.readingLength == 3 }.shuffled(random).forEach { candidate ->
+            if (words.size < offers.size && words.none {
+                it.text.first() == candidate.text.first() ||
+                    jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.TypingLanguages.forTag(it.languageTag)
+                        .defaultRoman(it.characters).first() ==
+                    jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.TypingLanguages.forTag(candidate.languageTag)
+                        .defaultRoman(candidate.characters).first()
+            }) words += candidate.copy(id = "upgrade-" + wordVersion++ + "-" + words.size)
+        }
+        // Tiny injected dictionaries used by domain callers still get unambiguous menu commands.
+        val fallback = listOf(WordDefinition("u-light", "ひかり", "光"),
+            WordDefinition("u-bond", "きずな", "絆"), WordDefinition("u-wing", "つばさ", "翼"))
+        val selectedWords = if (words.size == offers.size) words else fallback.take(offers.size)
+        upgradeSelection = UpgradeSelection(offers, selectedWords, evolution, world.level, engine.inputMode)
+        pendingTokens = emptyList()
+        refreshStates()
+        inputEpoch++
+    }
+
+    fun rerollUpgrades(): Boolean {
+        val selection = upgradeSelection ?: return false
+        if (!canRerollUpgrades) return false
+        rerollsRemaining--
+        showReward(selection.evolution)
+        return true
+    }
+
+    fun tapUpgrade(index: Int) { upgradeSelection?.tap(index) }
 
     /** Uses the same speculative-composition contract as the existing input test and title menu. */
     fun onInput(tokens: List<InputToken>, composing: Boolean): Boolean {
+        upgradeSelection?.let { return it.onInput(tokens, composing) }
         if (world.isGameOver) return false
         val preview = if (composing) engine.previewInput(tokens) else null
         val apply = !composing || preview!!.completedWords.isNotEmpty()
@@ -101,6 +165,12 @@ class CombatSession(
     }
 
     private fun complete(id: String) {
+        mutablePickupCaptions.firstOrNull { it.word.id == id }?.let {
+            world.activatePickup(it.pickup.id)
+            engine.removeWord(id)
+            mutablePickupCaptions.remove(it)
+            return
+        }
         val caption = mutableCaptions.firstOrNull { it.word.id == id } ?: return
         val completed = engine.completedSnapshot(id) ?: caption.state.copy(isCompleted = true,
             matchedInputCharacters = caption.state.inputText.length)
@@ -109,7 +179,7 @@ class CombatSession(
         if (caption.retired) {
             engine.removeWord(id)
         } else {
-            world.target(caption.enemyId)
+            world.completeWord(caption.word, caption.enemyId)
             val next = selectWord(caption.enemyId)
             engine.replaceWord(id, next)
             mutableCaptions += EnemyCaption(caption.enemyId, next, caption.anchor,
@@ -139,6 +209,16 @@ class CombatSession(
                     }
                 }
             }
+            is CombatEvent.PickupSpawned -> {
+                val word = selectWord(-event.pickup.id).copy(id = "pickup-" + event.pickup.id + "-" + wordVersion++)
+                engine.addWord(word, pendingTokens)
+                mutablePickupCaptions += PickupCaption(event.pickup, word,
+                    engine.snapshot().first { it.definition.id == word.id })
+            }
+            is CombatEvent.PickupRemoved -> {
+                mutablePickupCaptions.filter { it.pickup.id == event.id }.forEach { engine.removeWord(it.word.id) }
+                mutablePickupCaptions.removeAll { it.pickup.id == event.id }
+            }
         } }
         refreshStates()
     }
@@ -147,6 +227,7 @@ class CombatSession(
         val states = if (pendingTokens.isEmpty()) engine.snapshot() else engine.previewInput(pendingTokens).words
         val byId = states.associateBy { it.definition.id }
         mutableCaptions.forEach { caption -> byId[caption.word.id]?.let { caption.state = it } }
+        mutablePickupCaptions.forEach { caption -> byId[caption.word.id]?.let { caption.state = it } }
     }
 
     private fun pruneRetired() {
@@ -155,7 +236,8 @@ class CombatSession(
     }
 
     private fun selectWord(enemyId: Long): WordDefinition {
-        val used = mutableCaptions.filter { !it.retired }.map { it.word.text }.toSet()
+        val used = (mutableCaptions.filter { !it.retired }.map { it.word.text } +
+            mutablePickupCaptions.map { it.word.text }).toSet()
         val pool = playableDefinitions.filter { it.text !in used }.ifEmpty { playableDefinitions }
         val groupedByLength = pool.groupBy { it.readingLength }
         val selectedLength = wordLengthPolicy.chooseLength(world.elapsedSeconds, groupedByLength.keys, random)

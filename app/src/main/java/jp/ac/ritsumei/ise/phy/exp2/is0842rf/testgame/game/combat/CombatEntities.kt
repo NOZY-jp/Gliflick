@@ -4,6 +4,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 data class Vec2(val x: Float, val y: Float) {
@@ -115,9 +116,13 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
     var deathAge: Float? = null
         internal set
     val isAlive get() = hp > 0 && deathAge == null
+    var frozenSeconds = 0f
+    val statuses = mutableListOf<EnemyStatus>()
     fun advance(dt: Float, destination: Vec2) {
         previousPosition = position
-        if (isAlive) behavior.update(this, dt, destination)
+        if (frozenSeconds > 0f) { frozenSeconds = (frozenSeconds - dt).coerceAtLeast(0f); return }
+        val slow = if (statuses.any { it.type == DamageType.CHEMICAL && it.remaining > 0f }) 0.6f else 1f
+        if (isAlive) behavior.update(this, dt * slow, destination)
     }
     fun takeDamage(damage: Int): Int {
         val hpBefore = hp
@@ -136,16 +141,23 @@ class Player(val maxHp: Int = 300, val radius: Float = 11f) {
 class Projectile(
     var position: Vec2,
     var velocity: Vec2,
-    val damage: Int = 35,
+    var damage: Int = 35,
     val radius: Float = 1.25f,
     val criticalChance: Float = 0f,
-    val criticalDamageMultiplier: Float = 1.5f
+    val criticalDamageMultiplier: Float = 1.5f,
+    val source: WeaponId = WeaponId.REPEATER,
+    val damageType: DamageType = DamageType.KINETIC,
+    val explosionRadius: Float = 0f,
+    var ricochets: Int = 0,
+    val freezeChance: Float = 0f
 ) {
     init {
         require(damage >= 0 && radius > 0f)
         require(criticalChance in 0f..1f && criticalDamageMultiplier >= 1f)
     }
     var previousPosition = position
+    val hitEnemyIds = mutableSetOf<Long>()
+    var hasRicocheted = false
     var age = 0f
         private set
     fun advance(dt: Float) {
@@ -196,13 +208,16 @@ interface MainWeapon {
 }
 
 /** Scheduling survives target death; aim is frozen separately for every emitted projectile. */
-class Repeater(val definition: RepeaterDefinition = RepeaterDefinition()) : MainWeapon {
+class Repeater(val definition: RepeaterDefinition = RepeaterDefinition(),
+               val upgrades: WeaponRunState = WeaponRunState(WeaponId.REPEATER)) : MainWeapon {
     override val displayName = "リピーター"
-    private data class Burst(val enemyId: Long, var lastAim: Vec2, var remaining: Int = 3)
+    private data class Burst(val enemyId: Long, var lastAim: Vec2, var remaining: Int = 3, val total: Int = remaining)
     private val bursts = ArrayDeque<Burst>()
     private var cooldown = 0f
     val pendingShots get() = bursts.sumOf { it.remaining }
-    override fun target(enemyId: Long, position: Vec2) { bursts.addLast(Burst(enemyId, position, definition.burstCount)) }
+    override fun target(enemyId: Long, position: Vec2) {
+        bursts.addLast(Burst(enemyId, position, definition.burstCount + 5 * upgrades.rank(RepeaterEvolution.SHOTGUN)))
+    }
     override fun targetDied(enemyId: Long, position: Vec2) {
         bursts.filter { it.enemyId == enemyId }.forEach { it.lastAim = position }
     }
@@ -223,15 +238,31 @@ class Repeater(val definition: RepeaterDefinition = RepeaterDefinition()) : Main
         while (bursts.isNotEmpty() && cooldown <= 0f) {
             val burst = bursts.first()
             resolve(burst.enemyId)?.let { burst.lastAim = it }
-            val direction = (burst.lastAim - origin).normalized()
+            val aim = burst.lastAim - origin
+            val shotgun = upgrades.rank(RepeaterEvolution.SHOTGUN)
+            val spread = if (shotgun == 0) 0f else if (shotgun == 1) 0.44f else 0.88f
+            val shotIndex = burst.total - burst.remaining
+            val offset = if (burst.total <= 1) 0f else (shotIndex.toFloat() / (burst.total - 1) - 0.5f) * spread
+            val angle = kotlin.math.atan2(aim.y, aim.x) + offset
+            val direction = Vec2(cos(angle), sin(angle))
             val bullet = definition.projectile
+            val frost = upgrades.rank(RepeaterEvolution.FROST_FANG)
+            val explosion = upgrades.rank(RepeaterEvolution.EXPLODING_BULLETS)
+            val baseDamage = bullet.damage - (if (shotgun > 0) 10 else 0) +
+                (if (frost == 0) 0 else if (frost == 1) 10 else 20) +
+                (if (explosion < 2) 0 else 5)
             emitted += WeaponAction.LaunchProjectile(Projectile(
                 position = origin,
                 velocity = direction * bullet.speed,
-                damage = bullet.damage,
+                damage = (baseDamage * upgrades.scale(WeaponStat.DAMAGE)).roundToInt().coerceAtLeast(1),
                 radius = bullet.radius,
-                criticalChance = (definition.criticalChance + modifiers.criticalChanceBonus).coerceAtMost(1f),
-                criticalDamageMultiplier = definition.criticalDamageMultiplier
+                criticalChance = (definition.criticalChance + upgrades.bonus(WeaponStat.CRIT) +
+                    modifiers.criticalChanceBonus).coerceAtMost(1f),
+                criticalDamageMultiplier = definition.criticalDamageMultiplier + upgrades.bonus(WeaponStat.CRIT_MULTIPLIER),
+                damageType = if (explosion > 0) DamageType.EXPLOSIVE else DamageType.KINETIC,
+                explosionRadius = if (explosion > 0) (if (explosion == 1) 15f else 20f) * upgrades.scale(WeaponStat.RANGE) else 0f,
+                ricochets = when (upgrades.rank(RepeaterEvolution.RICOCHET)) { 1 -> 3; 2 -> 5; else -> 0 },
+                freezeChance = if (frost > 0) 0.03f else 0f
             ))
             burst.remaining--
             if (burst.remaining == 0) bursts.removeFirst()

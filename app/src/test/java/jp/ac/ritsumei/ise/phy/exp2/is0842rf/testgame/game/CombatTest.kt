@@ -23,7 +23,7 @@ class CombatTest {
         val enemy = Enemy(1, EnemyDefinition(), Vec2(10f, 10f))
         enemy.advance(2f, Vec2(10f, 110f))
         assertEquals(10f, enemy.position.x, 0.001f)
-        assertEquals(27f, enemy.position.y, 0.001f)
+        assertEquals(21.9f, enemy.position.y, 0.001f)
     }
 
     @Test fun emittedBulletDoesNotHomeAfterTargetMoves() {

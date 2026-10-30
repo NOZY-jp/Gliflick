@@ -47,6 +47,12 @@ class CombatActivity : AppCompatActivity() {
             editor.text?.clear()
             getSystemService(InputMethodManager::class.java).restartInput(editor)
         }
+        arena.onInputBoundary = {
+            editor.inputDecoder.reset()
+            editor.text?.let(android.view.inputmethod.BaseInputConnection::removeComposingSpans)
+            editor.text?.clear()
+            getSystemService(InputMethodManager::class.java).restartInput(editor)
+        }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
