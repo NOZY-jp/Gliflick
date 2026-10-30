@@ -7,13 +7,15 @@ data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExp
                                  val experienceIncreasePerLevel: Int = 20) {
     init { require(killExperience >= 0 && firstLevelExperience > 0 && experienceIncreasePerLevel >= 0) }
 }
-data class CombatConfig(val spawningEnabled: Boolean = true, val playerMaxHp: Int = 300,
+data class CombatConfig(val spawningEnabled: Boolean = true, val maxEnemiesAlive: Int = 16,
+                        val playerMaxHp: Int = 300,
                         val progression: ProgressionDefinition = ProgressionDefinition()) {
-    init { require(playerMaxHp > 0) }
+    init { require(maxEnemiesAlive > 0 && playerMaxHp > 0) }
 }
 
 fun interface EnemySpawnPolicy {
     fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random): EnemyDefinition
+    fun onBossDefeated(bossesDefeated: Int) = Unit
 }
 class FixedEnemySpawnPolicy(private val definition: EnemyDefinition = EnemyDefinition()) : EnemySpawnPolicy {
     override fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random) = definition
@@ -49,6 +51,7 @@ class CombatWorld(
     var level = 1; private set
     var experience = 0; private set
     var kills = 0; private set
+    var bossesDefeated = 0; private set
     /** Placeholder until the public Threat formula and its mapping to spawns are known. */
     var threat: Threat = Threat.NONE
         private set
@@ -105,6 +108,12 @@ class CombatWorld(
 
     fun drainEvents(): List<CombatEvent> = events.toList().also { events.clear() }
 
+    /** Unlocks the next Drone tier after a future boss system reports a defeat. */
+    fun notifyBossDefeated() {
+        bossesDefeated++
+        spawnPolicy.onBossDefeated(bossesDefeated)
+    }
+
     fun update(dt: Float) {
         require(dt >= 0f && dt.isFinite())
         if (width == 0f) return
@@ -155,7 +164,9 @@ class CombatWorld(
                 projectile.position.y !in -32f..height + 32f) spent += projectile
         }
         mutableProjectiles.removeAll(spent)
-        if (config.spawningEnabled && spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
+        val livingCount = mutableEnemies.count { it.isAlive }
+        if (config.spawningEnabled && livingCount < config.maxEnemiesAlive &&
+            spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level, random)
             spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
         }
