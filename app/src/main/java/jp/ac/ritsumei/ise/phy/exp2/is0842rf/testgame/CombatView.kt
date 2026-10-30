@@ -16,7 +16,7 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
         private set
     var onInputRequested: (() -> Unit)? = null
     var onRestart: (() -> Unit)? = null
-    private val renderer = CombatRenderer()
+    private val renderer = CombatRenderer(context)
     private var running = false
     private var lastFrame = 0L
     private var accumulator = 0f

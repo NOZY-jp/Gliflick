@@ -11,10 +11,37 @@ Play opens combat immediately. A fixed central player, elapsed timer, level, lin
 - `EnemyDefinition` separates kind, variant, shape and fixed balance. Each `Enemy` creates its own `EnemyBehavior` and `Durability`; pursuit and ordinary HP are the current implementations. Shields or immunity can replace durability without changing projectile collision.
 - `MainWeapon` is the targeting/update contract; `RepeaterDefinition` and `ProjectileDefinition` hold its balance. Weapons emit `WeaponAction` commands; the world resolves those commands. A future beam or area effect adds a command/handler without changing input transport or the activity.
 - `EnemySpawnPolicy` selects definitions from elapsed time and player level. The current policy selects only a normal drone; new enemy selection does not belong in the renderer or keyboard controller.
+- `WordDefinition.readingLength` is derived from the reading, and `WordLengthPolicy` selects a length before `CombatSession` chooses a word from that group. The length schedule does not depend on enemy type or weapon.
 - `CombatWorld` advances movement, scheduled shots, swept circle collisions, spawning, damage, XP and death effects. It has no Android or IME dependencies.
 - `CombatSession` connects world events to dynamic word targets and caption animations. Enemy lifetime and caption lifetime are independent.
 - `WordMatchEngine` remains the shared correctness/streak engine. Dynamic addition/removal and retiring a target preserve other candidates. Retirement disables fresh starts after the already observed input, including an unfinished IME composition; current paths may still finish.
 - `CombatView` runs a fixed 120Hz simulation on the UI thread through Choreographer. `CombatRenderer` draws snapshots. Activity lifecycle pauses the clock and simulation; the available arena follows system/IME insets.
+
+## Reading-length progression
+
+The combat word pool uses Japanese readings from two through seven Unicode code points. `readingLength` comes from `splitTextCharacters(reading)`, so small kana and the long-vowel mark each count as one, matching the existing reading-character streak rule. The diagnostic word-list screen still has access to the full list, including entries longer than seven.
+
+The pool is grouped by `readingLength` and currently contains:
+
+| Reading length | Words |
+| ---: | ---: |
+| 2 | 108 |
+| 3 | 172 |
+| 4 | 164 |
+| 5 | 71 |
+| 6 | 59 |
+| 7 | 59 |
+
+`ProgressiveGaussianWordLengthPolicy` controls which groups are available and the Gaussian centre. The maximum starts at three and increases once every four minutes, reaching seven at 16 minutes. The centre starts at two and increases by 0.5 once every two minutes, reaching six at 16 minutes. Standard deviation starts at one and is configurable. For each available length `n`, the policy uses `exp(-0.5 * ((n - centre) / standardDeviation)^2)` and normalizes across the unlocked groups that contain unused words. It chooses a length first, then selects uniformly within that group so group size does not multiply the length probability. At the boundaries, truncating a discrete distribution means the observed sample average may differ slightly from its centre.
+
+| Elapsed | Unlocked lengths | Gaussian centre |
+| ---: | --- | ---: |
+| 0 min | 2–3 | 2.0 |
+| 2 min | 2–3 | 2.5 |
+| 4 min | 2–4 | 3.0 |
+| 8 min | 2–5 | 4.0 |
+| 12 min | 2–6 | 5.0 |
+| 16 min onward | 2–7 | 6.0 |
 
 ## Lifetimes and targeting
 

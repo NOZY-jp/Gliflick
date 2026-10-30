@@ -24,8 +24,10 @@ class CompletedCaption(val state: WordMatchState, var anchor: Vec2) {
 class CombatSession(
     private val definitions: List<WordDefinition>,
     val world: CombatWorld = CombatWorld(),
-    private val random: Random = Random.Default
+    private val random: Random = Random.Default,
+    private val wordLengthPolicy: WordLengthPolicy = ProgressiveGaussianWordLengthPolicy()
 ) {
+    private val playableDefinitions = definitions.filter { it.readingLength in 2..7 }
     private val engine = WordMatchEngine(emptyList())
     private val mutableCaptions = mutableListOf<EnemyCaption>()
     private val mutableCompletions = mutableListOf<CompletedCaption>()
@@ -38,7 +40,7 @@ class CombatSession(
     var overlapEvents: List<OverlapEvent> = emptyList()
         private set
 
-    init { require(definitions.isNotEmpty()) }
+    init { require(playableDefinitions.isNotEmpty()) { "Combat needs words with readings from 2 to 7 characters." } }
 
     fun resize(width: Float, height: Float) {
         if (world.width > 0f) {
@@ -144,7 +146,10 @@ class CombatSession(
 
     private fun selectWord(enemyId: Long): WordDefinition {
         val used = mutableCaptions.filter { !it.retired }.map { it.word.text }.toSet()
-        val pool = definitions.filter { it.text !in used }.ifEmpty { definitions }
-        return pool[random.nextInt(pool.size)].copy(id = "enemy-$enemyId-word-${wordVersion++}")
+        val pool = playableDefinitions.filter { it.text !in used }.ifEmpty { playableDefinitions }
+        val groupedByLength = pool.groupBy { it.readingLength }
+        val selectedLength = wordLengthPolicy.chooseLength(world.elapsedSeconds, groupedByLength.keys, random)
+        val lengthPool = groupedByLength[selectedLength] ?: pool
+        return lengthPool[random.nextInt(lengthPool.size)].copy(id = "enemy-$enemyId-word-${wordVersion++}")
     }
 }

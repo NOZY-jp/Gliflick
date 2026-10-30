@@ -1,5 +1,6 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.render
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -20,7 +21,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /** Presentation only: no matching, damage, spawning, or weapon timing. Coordinates are logical dp. */
-class CombatRenderer {
+class CombatRenderer(context: Context) {
+    private val gridBackground = GridBackgroundRenderer(context)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ink = Color.rgb(70, 70, 70)
     private val idle = Color.rgb(184, 184, 184)
@@ -41,6 +43,7 @@ class CombatRenderer {
         paint.shader = background
         canvas.drawRect(0f, 0f, width, height, paint)
         paint.shader = null
+        gridBackground.draw(canvas, width)
 
         world.deathBursts.forEach { burst -> burst.particles.forEach { particle ->
             val size = particle.sizeAt(burst.age)

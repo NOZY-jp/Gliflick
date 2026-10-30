@@ -8,6 +8,8 @@ data class WordDefinition(
     val languageTag: String = "ja"
 ) {
     val characters: List<String> = splitTextCharacters(text)
+    /** Number of Unicode characters in the reading; small kana and ー each count once. */
+    val readingLength: Int get() = characters.size
 
     init {
         require(id.isNotBlank()) { "A word must have an id." }

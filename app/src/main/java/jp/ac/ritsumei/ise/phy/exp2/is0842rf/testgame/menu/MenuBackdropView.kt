@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.R
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.render.GridBackgroundRenderer
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
@@ -21,17 +22,10 @@ class MenuBackdropView(context: Context) : View(context) {
             invalidate()
         }
 
-    private val gridBitmap: Bitmap = BitmapFactory.decodeResource(
-        resources,
-        R.drawable.menu_grid,
-        BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ALPHA_8 }
-    ) ?: error("The title grid PNG could not be decoded")
+    private val grid = GridBackgroundRenderer(context)
     private val targetBitmap = decodeBitmap(R.drawable.title_target)
     private val navigationMarksBitmap = decodeBitmap(R.drawable.title_navigation_marks)
     private val warderBitmap = decodeBitmap(R.drawable.warder_barrier)
-    private val gridPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
-        color = context.getColor(R.color.menu_grid)
-    }
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = context.getColor(R.color.menu_shape)
         style = Paint.Style.STROKE
@@ -58,8 +52,7 @@ class MenuBackdropView(context: Context) : View(context) {
         val unit = width / DESIGN_WIDTH
         canvas.save()
         canvas.scale(unit, unit)
-        canvas.drawBitmap(gridBitmap, null,
-            RectF(0f, 0f, DESIGN_WIDTH, gridBitmap.height.toFloat()), gridPaint)
+        grid.draw(canvas, DESIGN_WIDTH)
 
         outlinePaint.alpha = (255f * (1f - transitionProgress)).roundToInt()
         if (outlinePaint.alpha > 0) {
