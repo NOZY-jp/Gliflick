@@ -19,7 +19,7 @@ Play opens combat immediately. A fixed central player, elapsed timer, level, lin
 
 ## Reading-length progression
 
-The combat word pool uses Japanese readings from two through seven Unicode code points. `readingLength` comes from `splitTextCharacters(reading)`, so small kana and the long-vowel mark each count as one, matching the existing reading-character streak rule. The diagnostic word-list screen still has access to the full list, including entries longer than seven.
+The combat word pool uses Japanese readings from two through seven Unicode code points. `readingLength` comes from `splitTextCharacters(reading)`, so small kana and the long-vowel mark each count as one, matching the existing reading-character streak rule. The diagnostic word-list screen uses the same curated set; every entry is within the 2–7 character reading range.
 
 The pool is grouped by `readingLength` and currently contains:
 
@@ -28,9 +28,11 @@ The pool is grouped by `readingLength` and currently contains:
 | 2 | 108 |
 | 3 | 172 |
 | 4 | 164 |
-| 5 | 71 |
-| 6 | 59 |
-| 7 | 59 |
+| 5 | 103 |
+| 6 | 100 |
+| 7 | 100 |
+
+The curated list contains 747 entries; every reading-length group has at least 100 candidates. It uses standalone words and established compounds. The only particle-bearing expressions are the two requested idioms, 「黄泉の国」 and 「虎の巻」.
 
 `ProgressiveGaussianWordLengthPolicy` controls which groups are available and the Gaussian centre. The maximum starts at three and increases once every four minutes, reaching seven at 16 minutes. The centre starts at two and increases by 0.5 once every two minutes, reaching six at 16 minutes. Standard deviation starts at one and is configurable. For each available length `n`, the policy uses `exp(-0.5 * ((n - centre) / standardDeviation)^2)` and normalizes across the unlocked groups that contain unused words. It chooses a length first, then selects uniformly within that group so group size does not multiply the length probability. At the boundaries, truncating a discrete distribution means the observed sample average may differ slightly from its centre.
 
