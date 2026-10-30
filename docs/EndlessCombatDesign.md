@@ -57,6 +57,16 @@ Public sources only describe the original threat system at a high level. The [Gl
 
 Scheduled enemies begin outside one of the four viewport edges, at least their effective radius plus 12dp beyond it. Each enemy has a numeric `size` multiplier; effective radius is base radius × size. Collision, spawn margins, body geometry, hit feedback, captions and health bars all use that effective size. Every Drone tier is circular, and `EnemyMarkerPattern` reproduces the seven visual motifs in the [official Wiki tier images](https://alias.black/glyphica/wiki_english.html): dot, ringed dot, double-ringed dot, bullseye, center-hole disk, segmented center-hole disk, and ringed segmented disk. Tier size scales are normalized against the first image's body diameter: 1, 2, 2.83, 2.83, 2.83, 3, and 3.33; these are image-derived world-unit conversions, not published numeric radii. Their caption follows their position from the moment they spawn; it is not projected to a separate handoff point or clamped to the viewport, so part or all of it can remain clipped until the enemy enters. Layout is selected once from the spawn origin: enemies originating in the upper half place their word 34dp below the body and their health bar above it, while lower-half spawns keep the word 22dp above and the health bar below. Font size, these offsets and health-bar dimensions scale with enemy size. The chosen side remains fixed as the enemy moves across the arena.
 
+| Tier | Official image | Marker | Size scale |
+| ---: | --- | --- | ---: |
+| 1 | [Drone.png](https://alias.black/glyphica/img/Drone.png) | Solid dot | 1.00 |
+| 2 | [Drone2.png](https://alias.black/glyphica/img/Drone2.png) | Ringed dot | 2.00 |
+| 3 | [Drone3.png](https://alias.black/glyphica/img/Drone3.png) | Double-ringed dot | 2.83 |
+| 4 | [Drone4.png](https://alias.black/glyphica/img/Drone4.png) | Bullseye | 2.83 |
+| 5 | [Drone5.png](https://alias.black/glyphica/img/Drone5.png) | Center-hole disk | 2.83 |
+| 6 | [Drone6.png](https://alias.black/glyphica/img/Drone6.png) | Segmented center-hole disk | 3.00 |
+| 7 | [Drone7.png](https://alias.black/glyphica/img/Drone7.png) | Ringed segmented disk | 3.33 |
+
 ## Lifetimes and targeting
 
 Completion queues three shots in FIFO burst order, with 120ms between shots. Each shot samples the living target's position once and then travels without homing. If the target has died, remaining shots use its last known aim point. Collision selects the earliest intersected live body, independently of the selected target; relative swept-circle tests prevent tunnelling through moving drones.

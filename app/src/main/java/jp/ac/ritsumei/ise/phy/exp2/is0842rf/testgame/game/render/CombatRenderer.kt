@@ -34,6 +34,7 @@ class CombatRenderer(context: Context) {
     private val idle = Color.rgb(184, 184, 184)
     private val muted = Color.rgb(151, 151, 143)
     private val red = Color.rgb(170, 91, 100)
+    private val enemyRed = Color.rgb(158, 91, 96)
     private val light = Typeface.create("sans-serif-light", Typeface.NORMAL)
     private val enemyMarkerPaths = EnemyMarkerPattern.entries.associateWith(::createEnemyMarkerPath)
     private var background: Shader? = null
@@ -67,7 +68,7 @@ class CombatRenderer(context: Context) {
         world.enemies.forEach { enemy ->
             val alpha = (255f * (1f - (enemy.deathAge ?: 0f) / CombatWorld.DEATH_FADE_SECONDS)
                 .coerceIn(0f, 1f)).toInt()
-            paint.color = red
+            paint.color = enemyRed
             paint.alpha = alpha
             drawEnemyBody(canvas, enemy)
             drawEnemyHealthBar(canvas, enemy, alpha, enemy.spawnOrigin.y < world.height / 2f)
