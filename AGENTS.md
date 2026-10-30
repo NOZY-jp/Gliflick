@@ -20,7 +20,7 @@
 - Completing a word queues an attack and replaces that caption; only HP depletion counts as a combat kill. The shared WordMatchEngine remains the correctness boundary.
 - A dead enemy's partially typed caption may only continue its already observed input, including pending IME composition. It cannot begin fresh matches, fire, earn new reading streak or overlap rewards. Removing/spawning an enemy must not fabricate a mistype or replay old input into a new target.
 - Every projectile freezes its own direction at emission and uses earliest swept collision, including non-target enemies. A queued burst survives target death and fires remaining shots toward the last known point.
-- Damage feedback is created from the resolved hit position, damage value, and incoming projectile angle in CombatWorld; CombatRenderer only draws it. Show enemy health bars only below maximum HP and keep impact numbers, rings, and fragments tied to that hit's lifetime.
+- Damage feedback starts at the enemy's interpolated centre at hit time and is created from that position, damage value, and incoming projectile angle in CombatWorld; fragments travel at Θ + 180° ± 60°. CombatRenderer only draws it. Show enemy health bars only below maximum HP and keep impact numbers, rings, and fragments tied to that hit's lifetime.
 
 ## Version control
 

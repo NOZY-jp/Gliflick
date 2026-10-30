@@ -193,7 +193,7 @@ class HitFeedback(
     var origin: Vec2,
     val damage: Int,
     var enemyRadius: Float,
-    impactAngle: Float,
+    incomingAngle: Float,
     random: Random
 ) {
     var age = 0f
@@ -210,13 +210,13 @@ class HitFeedback(
 
     val fragments = List(FRAGMENT_COUNT) {
         val spread = (random.nextFloat() * 2f - 1f) * MAX_SPREAD_RADIANS
-        val travelAngle = impactAngle + PI.toFloat() + spread
+        val travelAngle = incomingAngle + PI.toFloat() + spread
         DamageFragment(
             travelAngle = travelAngle,
             rotation = travelAngle,
-            initialLength = enemyRadius * (0.7f + random.nextFloat() * 0.9f),
-            thickness = (enemyRadius * 0.18f).coerceAtLeast(0.65f),
-            speed = 18f + random.nextFloat() * 36f,
+            initialLength = enemyRadius * (1.2f + random.nextFloat() * 1.4f),
+            thickness = (enemyRadius * 0.28f).coerceAtLeast(1f),
+            speed = 25f + random.nextFloat() * 45f,
             lifetime = 0.25f + random.nextFloat() * 0.16f
         )
     }
@@ -232,7 +232,7 @@ class HitFeedback(
         const val FRAGMENT_COUNT = 10
         const val DAMAGE_NUMBER_LIFETIME = 0.64f
         const val RING_LIFETIME = 0.24f
-        private const val MAX_SPREAD_RADIANS = 2f * PI.toFloat() / 3f
+        private const val MAX_SPREAD_RADIANS = PI.toFloat() / 3f
     }
 }
 

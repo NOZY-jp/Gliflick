@@ -86,11 +86,11 @@ class CombatWorld(
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let { mainWeapon.target(it.id, it.position) }
     }
 
-    fun damageEnemy(enemyId: Long, damage: Int, impactAngle: Float? = null) {
+    fun damageEnemy(enemyId: Long, damage: Int, incomingAngle: Float? = null) {
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
             val applied = it.takeDamage(damage)
             if (applied > 0) {
-                val angle = impactAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
+                val angle = incomingAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
                 mutableHitFeedback += HitFeedback(it.position, applied, it.definition.radius, angle, random)
             }
             if (!it.isAlive) die(it, awardExperience = true)
@@ -139,9 +139,9 @@ class CombatWorld(
                     (hit.first.position - hit.first.previousPosition) * hit.second
                 val applied = hit.first.takeDamage(projectile.damage)
                 if (applied > 0) {
-                    val impactAngle = atan2(projectile.velocity.y, projectile.velocity.x)
+                    val incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x)
                     mutableHitFeedback += HitFeedback(enemyPositionAtImpact, applied,
-                        hit.first.definition.radius, impactAngle, random)
+                        hit.first.definition.radius, incomingAngle, random)
                 }
                 if (!hit.first.isAlive) die(hit.first, awardExperience = true)
                 spent += projectile
