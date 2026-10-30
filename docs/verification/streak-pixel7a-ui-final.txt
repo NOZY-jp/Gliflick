@@ -1,0 +1,37 @@
+INSTRUMENTATION_STATUS: class=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.GameInputInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=
+jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.GameInputInstrumentedTest:
+INSTRUMENTATION_STATUS: test=overlapStreakAndMistakesReachTheEightWordUi
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.GameInputInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=overlapStreakAndMistakesReachTheEightWordUi
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.GameInputInstrumentedTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=sharedAndSeparateWordsDisplaySixAndEightKana
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.GameInputInstrumentedTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=sharedAndSeparateWordsDisplaySixAndEightKana
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 7.7
+
+OK (2 tests)
+
+
+INSTRUMENTATION_CODE: -1
