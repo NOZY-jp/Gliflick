@@ -55,9 +55,9 @@ On enemy death, its body and inactive caption fade over 140ms. Ten independently
 
 ## Hit feedback
 
-When a projectile reduces an enemy's HP, `CombatWorld` records the hit position, actual HP reduction, enemy radius, and incoming shot angle in one `HitFeedback`. `CombatRenderer` draws a small health bar under that enemy only while HP is below maximum; its fill uses current HP, and it follows the enemy's death fade.
+When a projectile reduces an enemy's HP, `CombatWorld` records the enemy's interpolated centre at hit time, actual HP reduction, enemy radius, and incoming shot angle in one `HitFeedback`. The ring and fragments start from this enemy-centre position rather than the projectile's contact point. `CombatRenderer` draws a small health bar under that enemy only while HP is below maximum; its fill uses current HP, and it follows the enemy's death fade.
 
-The damage number starts above the impact and drifts upward 18dp over 640ms while opacity changes 100% -> 0% and scale changes 100% -> 50%. The impact ring lasts 240ms, with radius 100% -> 120% of the enemy radius and stroke width 30% -> 0% of that radius. Ten narrow rectangular fragments are emitted per hit; each travels within Θ + 180° ± 120°, oriented along its travel direction, with randomized initial length and speed. Its length falls linearly to zero over 250–410ms. These are independent hit effects, so a lethal hit can show both hit feedback and the existing death burst.
+The damage number starts slightly above the enemy's top edge and drifts upward 18dp over 640ms. Its initial opacity is 75% and fades to 0%; its 16.5dp type size is 1.5 times the previous size and still scales from 100% to 50%. The impact ring lasts 240ms, starting at the enemy radius and expanding to 120%, with stroke width 30% -> 0% of that radius. Ten narrow rectangular fragments are emitted per hit; each travels within Θ + 180° ± 120°, oriented along its travel direction, with randomized initial length and speed. Its length falls linearly to zero over 250–410ms. The health bar is twice its previous width, sits 8dp below the enemy, and uses neutral grey for both track and fill. These are independent hit effects, so a lethal hit can show both hit feedback and the existing death burst.
 
 ## Initial balance choices
 

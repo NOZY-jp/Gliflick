@@ -200,9 +200,9 @@ class HitFeedback(
         private set
 
     val numberProgress get() = (age / DAMAGE_NUMBER_LIFETIME).coerceIn(0f, 1f)
-    val numberAlpha get() = 1f - numberProgress
+    val numberAlpha get() = 0.75f * (1f - numberProgress)
     val numberScale get() = 1f - 0.5f * numberProgress
-    val numberBaseline get() = origin.y - enemyRadius - 7f - 18f * numberProgress
+    val numberBaseline get() = origin.y - enemyRadius - 12f - 18f * numberProgress
     val ringProgress get() = (age / RING_LIFETIME).coerceIn(0f, 1f)
     val ringRadius get() = enemyRadius * (1f + 0.2f * ringProgress)
     val ringStrokeWidth get() = enemyRadius * 0.3f * (1f - ringProgress)

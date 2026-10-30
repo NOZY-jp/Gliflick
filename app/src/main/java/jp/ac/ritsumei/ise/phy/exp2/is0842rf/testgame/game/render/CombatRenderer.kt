@@ -123,14 +123,14 @@ class CombatRenderer(context: Context) {
 
     private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int) {
         if (enemy.hp >= enemy.definition.maxHp) return
-        val width = max(12f, enemy.definition.radius * 2.6f)
+        val width = max(12f, enemy.definition.radius * 2.6f) * 2f
         val left = enemy.position.x - width / 2f
-        val top = enemy.position.y + enemy.definition.radius + 3f
+        val top = enemy.position.y + enemy.definition.radius + 8f
         paint.style = Paint.Style.FILL
         paint.alpha = alpha
-        paint.color = Color.rgb(199, 199, 188)
+        paint.color = Color.rgb(199, 199, 199)
         canvas.drawRect(left, top, left + width, top + 1.5f, paint)
-        paint.color = red
+        paint.color = Color.rgb(117, 117, 117)
         val hpFraction = (enemy.hp.toFloat() / enemy.definition.maxHp).coerceIn(0f, 1f)
         canvas.drawRect(left, top, left + width * hpFraction, top + 1.5f, paint)
         paint.alpha = 255
@@ -173,7 +173,7 @@ class CombatRenderer(context: Context) {
             paint.alpha = (255f * feedback.numberAlpha).toInt().coerceIn(0, 255)
             paint.typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
             paint.textAlign = Paint.Align.CENTER
-            paint.textSize = 11f
+            paint.textSize = 16.5f
             canvas.save()
             canvas.scale(feedback.numberScale, feedback.numberScale, x, baseline)
             canvas.drawText(feedback.damage.toString(), x, baseline, paint)

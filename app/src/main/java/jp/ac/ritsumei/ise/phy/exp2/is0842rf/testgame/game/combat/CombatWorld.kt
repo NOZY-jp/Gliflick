@@ -135,10 +135,12 @@ class CombatWorld(
                 val impactPosition = projectile.previousPosition +
                     (projectile.position - projectile.previousPosition) * hit.second
                 projectile.position = impactPosition
+                val enemyPositionAtImpact = hit.first.previousPosition +
+                    (hit.first.position - hit.first.previousPosition) * hit.second
                 val applied = hit.first.takeDamage(projectile.damage)
                 if (applied > 0) {
                     val impactAngle = atan2(projectile.velocity.y, projectile.velocity.x)
-                    mutableHitFeedback += HitFeedback(impactPosition, applied,
+                    mutableHitFeedback += HitFeedback(enemyPositionAtImpact, applied,
                         hit.first.definition.radius, impactAngle, random)
                 }
                 if (!hit.first.isAlive) die(hit.first, awardExperience = true)
