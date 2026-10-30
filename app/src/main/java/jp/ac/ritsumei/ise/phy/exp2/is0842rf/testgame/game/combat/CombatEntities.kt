@@ -21,6 +21,25 @@ enum class EnemyKind { DRONE }
 enum class EnemyVariant { NORMAL }
 enum class EnemyShape { CIRCLE }
 
+/** Reusable stat modifier attached to an individual enemy definition. */
+data class EnemyMutation(
+    val id: String,
+    val maxHpMultiplier: Float = 1f,
+    val speedMultiplier: Float = 1f,
+    val radiusMultiplier: Float = 1f
+) {
+    init {
+        require(id.isNotBlank())
+        require(maxHpMultiplier > 0f && speedMultiplier > 0f && radiusMultiplier > 0f)
+    }
+
+    companion object {
+        val NONE = EnemyMutation("normal")
+        val ENLARGED = EnemyMutation("enlarged", maxHpMultiplier = 3f, radiusMultiplier = 1.5f)
+        val HASTENED = EnemyMutation("hastened", speedMultiplier = 2f)
+    }
+}
+
 /** Reserved difficulty value. Its progression and gameplay effect are intentionally undefined. */
 data class Threat(val value: Double) {
     init { require(value >= 0.0 && value.isFinite()) }
@@ -37,9 +56,11 @@ data class EnemyDefinition(
     val contactDamage: Int = 40,
     val radius: Float = 4.5f,
     val behaviorFactory: () -> EnemyBehavior = { PursuePlayer() },
-    val durabilityFactory: (Int) -> Durability = { HealthPool(it) }
+    val durabilityFactory: (Int) -> Durability = { HealthPool(it) },
+    val tier: Int = 1,
+    val mutation: EnemyMutation = EnemyMutation.NONE
 ) {
-    init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && radius > 0f) }
+    init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && radius > 0f && tier > 0) }
 }
 
 /** Shielding or damage immunity can decorate this contract without changing collision resolution. */

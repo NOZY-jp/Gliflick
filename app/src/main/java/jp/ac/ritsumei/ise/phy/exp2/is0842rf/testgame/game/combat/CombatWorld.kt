@@ -21,10 +21,10 @@ data class CombatConfig(val maxEnemies: Int = 8, val playerMaxHp: Int = 300,
 }
 
 fun interface EnemySpawnPolicy {
-    fun choose(elapsedSeconds: Double, playerLevel: Int): EnemyDefinition
+    fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random): EnemyDefinition
 }
 class FixedEnemySpawnPolicy(private val definition: EnemyDefinition = EnemyDefinition()) : EnemySpawnPolicy {
-    override fun choose(elapsedSeconds: Double, playerLevel: Int) = definition
+    override fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random) = definition
 }
 
 sealed interface CombatEvent {
@@ -36,7 +36,7 @@ sealed interface CombatEvent {
 class CombatWorld(
     val config: CombatConfig = CombatConfig(),
     private val random: Random = Random.Default,
-    private val spawnPolicy: EnemySpawnPolicy = FixedEnemySpawnPolicy(),
+    private val spawnPolicy: EnemySpawnPolicy = DroneEnemySpawnPolicy(),
     val mainWeapon: MainWeapon = Repeater(),
     private val spawnSchedule: EnemySpawnSchedule = CompositeWaveSpawnSchedule()
 ) {
@@ -90,7 +90,7 @@ class CombatWorld(
         player.position = Vec2(width / 2f, height / 2f)
     }
 
-    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level)): Enemy =
+    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level, random)): Enemy =
         Enemy(nextEnemyId++, definition, position).also {
         mutableEnemies += it
         events += CombatEvent.Spawned(it)
@@ -167,7 +167,7 @@ class CombatWorld(
         val availableSlots = (config.maxEnemies - livingCount).coerceAtLeast(0)
         val requestedSpawns = spawnSchedule.update(dt, elapsedSeconds, level, random)
         repeat(requestedSpawns.coerceAtMost(availableSlots)) {
-            val definition = spawnPolicy.choose(elapsedSeconds, level)
+            val definition = spawnPolicy.choose(elapsedSeconds, level, random)
             spawnEnemy(spawnPosition(definition.radius), definition)
         }
     }

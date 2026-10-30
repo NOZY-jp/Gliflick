@@ -10,7 +10,7 @@ Play opens combat immediately. A fixed central player, elapsed timer, level, lin
 
 - `EnemyDefinition` separates kind, variant, shape and fixed balance. Each `Enemy` creates its own `EnemyBehavior` and `Durability`; pursuit and ordinary HP are the current implementations. Shields or immunity can replace durability without changing projectile collision.
 - `MainWeapon` is the targeting/update contract; `RepeaterDefinition` and `ProjectileDefinition` hold its balance. Weapons emit `WeaponAction` commands; the world resolves those commands. A future beam or area effect adds a command/handler without changing input transport or the activity.
-- `EnemySpawnPolicy` selects enemy definitions, while `EnemySpawnSchedule` independently selects spawn counts and timing. The current definition policy selects only a normal drone; neither decision belongs in the renderer or keyboard controller.
+- `EnemySpawnPolicy` selects enemy definitions, while `EnemySpawnSchedule` independently selects spawn counts and timing. `DroneEnemySpawnPolicy` selects a published Drone tier and one optional mutation; neither decision belongs in the renderer or keyboard controller.
 - `WordDefinition.readingLength` is derived from the reading, and `WordLengthPolicy` selects a length before `CombatSession` chooses a word from that group. The length schedule does not depend on enemy type or weapon.
 - `CombatWorld` advances movement, scheduled shots, swept circle collisions, spawning, damage, XP and death effects. It has no Android or IME dependencies.
 - `CombatSession` connects world events to dynamic word targets and caption animations. Enemy lifetime and caption lifetime are independent.
@@ -71,14 +71,24 @@ When a projectile reduces an enemy's HP, `CombatWorld` records the enemy's inter
 
 The damage number starts slightly above the enemy's top edge and drifts upward 18dp over 640ms. Its initial opacity is 75% and fades to 0%; its 16.5dp type size is 1.5 times the previous size and still scales from 100% to 50%. The impact ring lasts 240ms, starting at the enemy radius and expanding to 120%, with stroke width 30% -> 0% of that radius. Ten muted-ink rectangular fragments (the UI's #97978F grey) start at the enemy centre per hit; each travels within Θ ± 60° along the incoming projectile angle (for Θ=30°, the spread is -30°–90°), oriented along its travel direction. Initial length is 1.2–2.6 enemy radii, thickness is 28% of the radius (minimum 1dp), and speed is 25–70dp/s. Its length falls linearly to zero over 375–615ms, 1.5 times the previous lifetime, so fragments travel farther before disappearing. The health bar is twice its previous width, sits 8dp below the enemy, and uses neutral grey for both track and fill. These are independent hit effects, so a lethal hit can show both hit feedback and the existing death burst.
 
+## Drone tiers and mutations
+
+The [official enemy table](https://alias.black/glyphica/wiki_english.html) publishes seven Drone balance rows. In table order, their HP/contact damage are 80/40, 200/60, 500/90, 1,000/120, 1,800/150, 3,200/180, and 5,800/210. Absolute Drone speed is not published; all tiers therefore use the prototype base speed of 8.5dp/s.
+
+The same Wiki says Drones can appear enlarged or hastened: Enlarged triples HP, while Hastened doubles movement speed. It gives no mutation probability and does not say that the two forms can co-occur. This project keeps them mutually exclusive as requested and uses a configurable 5% combined chance per Drone spawn (2.5% for each form). Enlarged also uses a 1.5× radius so the size change is visible; that radius multiplier is local tuning, not a published value. Mutations do not change tier contact damage.
+
+The Wiki describes Threat as rising during a run and says Endless uses the higher of Threat and a player-level adaptive value to determine spawn difficulty, but publishes neither the Threat formula nor tier thresholds. The local `DroneTierProgressionPolicy` leaves `Threat` untouched and selects `min(7, max(1 + floor(elapsedSeconds / 120), 1 + floor((playerLevel - 1) / 4)))`. Thus either two minutes of elapsed time or four player levels advances the tier; this is explicit prototype tuning, not a claim about the source game's exact rule.
+
+The official [Update 12 announcement](https://steamcommunity.com/app/2400160/announcements/) says two stronger late-game Drone levels were added, but provides no balance values. The Wiki table still lists seven rows, so this implementation caps at tier 7 and leaves the two later rows out until their HP and contact-damage values are published or measured.
+
 ## Initial balance choices
 
 | Parameter | Adopted value | Basis |
 | --- | --- | --- |
-| Drone HP / contact damage | 80 / 40 | First variant in the [official enemy table](https://alias.black/glyphica/wiki_english.html), checked 2026-10-30 |
+| Drone tiers HP / contact damage | 80/40, 200/60, 500/90, 1,000/120, 1,800/150, 3,200/180, 5,800/210 | Seven rows in the [official enemy table](https://alias.black/glyphica/wiki_english.html), checked 2026-10-30 |
 | Repeater kinetic damage / burst count | 35 / 3 | [Japanese community Wiki](https://wikiwiki.jp/glyphica/リピーター), checked 2026-10-30; secondary-source values, not independently measured |
 | Player HP | 300 | User's reference image; also appears in the official Wiki's health example |
-| Drone speed / radius | 8.5 logical dp/s / 4.5dp | Prototype screen tuning; public absolute values not verified |
+| Drone speed / radius | 8.5 logical dp/s / 4.5dp | Prototype screen tuning; public absolute values not verified. Enlarged uses 1.5× radius locally. |
 | Bullet speed / radius / shot interval | 520dp/s / 1.25dp / 120ms | Prototype screen tuning; public absolute values not verified |
 | Enemy count / spawn | No immediate enemies; eight alive maximum; 120s envelope, 5s groups, random trickle | Prototype wave tuning; exact source-game formula not public |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |
