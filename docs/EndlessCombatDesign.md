@@ -49,7 +49,7 @@ The curated list contains 1,625 entries; every reading-length group has at least
 
 `EnemySpawnPolicy` chooses which definition appears; `EnemySpawnDensity` decides whether one enemy appears in the current simulation step. The arena starts empty and random arrivals are possible immediately. Each step can create at most one enemy. There are no groups, pulse intervals, or delayed first wave.
 
-`RandomEnemySpawnDensity` samples an independent Poisson arrival chance each update: `1 - exp(-rate × dt)`. The rate starts at 0.9 enemies/second and moves smoothly between 0.8× and 1.2× over a 120-second density cycle. The player-level multiplier is `min(1 + 0.04 × (level - 1), 1.4)`. Every successful random decision creates one enemy; there is no living-enemy cap, interval timer, or multi-enemy request. Tests can explicitly disable arrivals through `CombatConfig.spawningEnabled`.
+`RandomEnemySpawnDensity` samples an independent Poisson arrival chance each update: `1 - exp(-rate × dt)`. The rate starts at 0.45 enemies/second and moves smoothly between 0.8× and 1.2× over a 120-second density cycle. The player-level multiplier is `min(1 + 0.04 × (level - 1), 1.4)`. Every successful random decision creates one enemy; there is no living-enemy cap, interval timer, or multi-enemy request. Tests can explicitly disable arrivals through `CombatConfig.spawningEnabled`.
 
 The spawn rate and level multiplier are explicit, editable prototype tuning, not a recovered Glyphica formula. The current `Threat` value is a placeholder at zero and has no effect on spawn density.
 
@@ -102,7 +102,7 @@ The official [Update 12 announcement](https://steamcommunity.com/app/2400160/ann
 | Drone tier appearance | Center disk stays constant; body scale 1 / 2 / 2.83, then remains 2.83 through Tier 7 | Outer circles are added through Tier 3; later tiers alter fill and holes without increasing the Tier 3 outer radius. Proportions follow the user's visual description. |
 | Drone tier weights | Tier 1 only at start; smooth Gaussian-like cloud advances by 1 per 120s or 4 player levels | Each new tier's probability ramps in across one progression step. Exact source-game Threat formula is unpublished. |
 | Bullet speed / radius / shot interval | 520dp/s / 1.25dp / 120ms | Prototype screen tuning; public absolute values not verified |
-| Enemy count / spawn | Random single arrivals; 0.9/s base rate modulated 0.8×–1.2× over 120s; 16 alive maximum | Rate cloud and level multiplier are local tuning; there are no groups or interval timer. |
+| Enemy count / spawn | Random single arrivals; 0.45/s base rate modulated 0.8×–1.2× over 120s; no alive cap | Rate cloud and level multiplier are local tuning; there are no groups or interval timer. |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |
 
 The default HP80 / damage35 requires three ordinary hits. A test injects damage40 to verify the user's two-hit-kill example still emits its third projectile. Crits, bleed and upgrades are deferred. The [lead developer's explanation](https://steamcommunity.com/app/2400160/discussions/0/591784375625107988/) confirms that the base Repeater has no range stat; bullets therefore leave only on contact or exiting the arena. Level changes update the HUD without weapon upgrades. Contact consumes a drone; HP0 stops combat and offers a tap to restart.

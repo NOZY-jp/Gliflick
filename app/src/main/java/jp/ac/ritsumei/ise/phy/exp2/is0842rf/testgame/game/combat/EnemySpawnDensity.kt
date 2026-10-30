@@ -11,7 +11,7 @@ fun interface EnemySpawnDensity {
 }
 
 data class SpawnDensityParameters(
-    val baseRatePerSecond: Double = 0.9,
+    val baseRatePerSecond: Double = 0.45,
     val smoothWavePeriodSeconds: Double = 120.0,
     val minimumWaveMultiplier: Double = 0.8,
     val maximumWaveMultiplier: Double = 1.2,
