@@ -11,8 +11,8 @@ fun interface EnemySpawnSchedule {
 }
 
 data class WaveSpawnParameters(
-    val firstBurstAtSeconds: Double = 5.0,
-    val firstTrickleAtSeconds: Double = 1.5,
+    val firstBurstAtSeconds: Double = 3.0,
+    val firstTrickleAtSeconds: Double = 0.8,
     val gentleWavePeriodSeconds: Double = 120.0,
     val burstPeriodSeconds: Double = 5.0,
     val burstTimingJitterSeconds: Double = 0.3,

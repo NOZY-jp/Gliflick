@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.Typeface
@@ -64,9 +65,7 @@ class CombatRenderer(context: Context) {
                 .coerceIn(0f, 1f)).toInt()
             paint.color = red
             paint.alpha = alpha
-            when (enemy.definition.shape) {
-                EnemyShape.CIRCLE -> canvas.drawCircle(enemy.position.x, enemy.position.y, enemy.definition.radius, paint)
-            }
+            drawEnemyBody(canvas, enemy)
             drawEnemyHealthBar(canvas, enemy, alpha, enemy.spawnOrigin.y < world.height / 2f)
         }
         world.hitFeedback.forEach { drawHitGeometry(canvas, it) }
@@ -85,11 +84,11 @@ class CombatRenderer(context: Context) {
         }
         drawPlayer(canvas, world)
         session.captions.forEach {
-            drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, it.placeBelowEnemy)
+            drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, it.placeBelowEnemy, it.size)
         }
         session.completions.forEach {
             val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
-            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy)
+            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy, it.size)
         }
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
@@ -125,11 +124,12 @@ class CombatRenderer(context: Context) {
 
     private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int, aboveEnemy: Boolean) {
         if (enemy.hp >= enemy.definition.maxHp) return
-        val width = max(12f, enemy.definition.radius * 2.6f) * 2f
+        val width = max(12f * enemy.size, enemy.radius * 2.6f) * 2f
         val left = enemy.position.x - width / 2f
-        val barHeight = 1.5f
-        val top = if (aboveEnemy) enemy.position.y - enemy.definition.radius - 8f - barHeight
-        else enemy.position.y + enemy.definition.radius + 8f
+        val barHeight = 1.5f * enemy.size
+        val gap = 8f * enemy.size
+        val top = if (aboveEnemy) enemy.position.y - enemy.radius - gap - barHeight
+        else enemy.position.y + enemy.radius + gap
         paint.style = Paint.Style.FILL
         paint.alpha = alpha
         paint.color = Color.rgb(199, 199, 199)
@@ -138,6 +138,25 @@ class CombatRenderer(context: Context) {
         val hpFraction = (enemy.hp.toFloat() / enemy.definition.maxHp).coerceIn(0f, 1f)
         canvas.drawRect(left, top, left + width * hpFraction, top + barHeight, paint)
         paint.alpha = 255
+    }
+
+    private fun drawEnemyBody(canvas: Canvas, enemy: Enemy) {
+        val centerX = enemy.position.x
+        val centerY = enemy.position.y
+        val radius = enemy.radius
+        if (enemy.definition.shape == EnemyShape.CIRCLE) {
+            canvas.drawCircle(centerX, centerY, radius, paint)
+            return
+        }
+        val path = Path()
+        repeat(enemy.definition.shape.sides) { index ->
+            val angle = -PI / 2.0 + 2.0 * PI * index / enemy.definition.shape.sides
+            val x = centerX + kotlin.math.cos(angle).toFloat() * radius
+            val y = centerY + kotlin.math.sin(angle).toFloat() * radius
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        canvas.drawPath(path, paint)
     }
 
     private fun drawHitGeometry(canvas: Canvas, feedback: HitFeedback) {
@@ -201,21 +220,21 @@ class CombatRenderer(context: Context) {
     }
 
     private fun drawCaption(canvas: Canvas, state: WordMatchState, anchor: Vec2, alpha: Float,
-                            scale: Float, arenaWidth: Float, placeBelowEnemy: Boolean) {
+                            scale: Float, arenaWidth: Float, placeBelowEnemy: Boolean, enemySize: Float) {
         if (alpha <= 0f) return
         paint.typeface = light
         paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 17f
-        val maxWidth = min(210f, arenaWidth - 20f)
+        paint.textSize = 17f * enemySize
+        val maxWidth = min(210f * enemySize, arenaWidth - 20f)
         val naturalWidth = paint.measureText(state.inputText).coerceAtLeast(1f)
         if (naturalWidth > maxWidth) paint.textSize *= maxWidth / naturalWidth
         val wordTextSize = paint.textSize
         val textWidth = paint.measureText(state.inputText)
         val centerX = anchor.x
-        paint.textSize = 10.5f
+        paint.textSize = 10.5f * enemySize
         val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
-        val centerY = anchor.y + if (placeBelowEnemy) 34f else -22f
+        val centerY = anchor.y + (if (placeBelowEnemy) 34f else -22f) * enemySize
         canvas.save()
         canvas.scale(scale, scale, centerX, centerY)
         paint.textSize = wordTextSize
@@ -228,13 +247,13 @@ class CombatRenderer(context: Context) {
             canvas.drawText(character, x, baseline, paint)
             x += paint.measureText(character)
         }
-        paint.textSize = 10.5f
+        paint.textSize = 10.5f * enemySize
         val fittedLabelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (fittedLabelWidth > maxWidth) paint.textSize *= maxWidth / fittedLabelWidth
         paint.textAlign = Paint.Align.CENTER
         paint.color = muted
         paint.alpha = (255f * alpha).toInt().coerceIn(0, 255)
-        canvas.drawText(state.definition.displayName, centerX, centerY - 16f, paint)
+        canvas.drawText(state.definition.displayName, centerX, centerY - 16f * enemySize, paint)
         canvas.restore()
         paint.alpha = 255
     }

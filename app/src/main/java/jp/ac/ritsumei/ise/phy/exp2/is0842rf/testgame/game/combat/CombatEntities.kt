@@ -19,23 +19,25 @@ data class Vec2(val x: Float, val y: Float) {
 
 enum class EnemyKind { DRONE }
 enum class EnemyVariant { NORMAL }
-enum class EnemyShape { CIRCLE }
+enum class EnemyShape(val sides: Int) {
+    CIRCLE(0), TRIANGLE(3), SQUARE(4), PENTAGON(5), HEXAGON(6), HEPTAGON(7), OCTAGON(8)
+}
 
 /** Reusable stat modifier attached to an individual enemy definition. */
 data class EnemyMutation(
     val id: String,
     val maxHpMultiplier: Float = 1f,
     val speedMultiplier: Float = 1f,
-    val radiusMultiplier: Float = 1f
+    val sizeMultiplier: Float = 1f
 ) {
     init {
         require(id.isNotBlank())
-        require(maxHpMultiplier > 0f && speedMultiplier > 0f && radiusMultiplier > 0f)
+        require(maxHpMultiplier > 0f && speedMultiplier > 0f && sizeMultiplier > 0f)
     }
 
     companion object {
         val NONE = EnemyMutation("normal")
-        val ENLARGED = EnemyMutation("enlarged", maxHpMultiplier = 3f, radiusMultiplier = 1.5f)
+        val ENLARGED = EnemyMutation("enlarged", maxHpMultiplier = 3f, sizeMultiplier = 1.5f)
         val HASTENED = EnemyMutation("hastened", speedMultiplier = 2f)
     }
 }
@@ -52,15 +54,16 @@ data class EnemyDefinition(
     val variant: EnemyVariant = EnemyVariant.NORMAL,
     val shape: EnemyShape = EnemyShape.CIRCLE,
     val maxHp: Int = 80,
-    val speed: Float = 8.5f,
+    val speed: Float = 5.95f,
     val contactDamage: Int = 40,
     val radius: Float = 4.5f,
+    val size: Float = 1f,
     val behaviorFactory: () -> EnemyBehavior = { PursuePlayer() },
     val durabilityFactory: (Int) -> Durability = { HealthPool(it) },
     val tier: Int = 1,
     val mutation: EnemyMutation = EnemyMutation.NONE
 ) {
-    init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && radius > 0f && tier > 0) }
+    init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && radius > 0f && size > 0f && tier > 0) }
 }
 
 /** Shielding or damage immunity can decorate this contract without changing collision resolution. */
@@ -88,6 +91,9 @@ class PursuePlayer : EnemyBehavior {
 }
 
 class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
+    /** Numeric per-instance scale applied consistently to collision and presentation. */
+    val size = definition.size
+    val radius get() = definition.radius * size
     var spawnOrigin = position
         internal set
     private val behavior = definition.behaviorFactory()

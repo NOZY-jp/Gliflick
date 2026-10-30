@@ -16,7 +16,7 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.R
 import kotlin.math.ceil
 import kotlin.math.max
 
-/** Width-based Figma proportions with native text, full-row buttons and a scrollable small-screen fallback. */
+/** Width-based Figma proportions with native text and full-row buttons. */
 class TitleMenuView(context: Context) : FrameLayout(context) {
     var onCommandClick: ((MenuCommand) -> Unit)? = null
     var onLaunchImeClick: (() -> Unit)? = null

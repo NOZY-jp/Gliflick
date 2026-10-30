@@ -47,7 +47,7 @@ The curated list contains 1,625 entries; every reading-length group has at least
 
 ## Enemy spawn waves and entry captions
 
-`EnemySpawnPolicy` chooses which definition appears; `EnemySpawnSchedule` decides when and how many enemies to request. The arena starts with no enemies. Low-rate random arrivals become possible after 1.5 seconds, and the first group is scheduled at 5 seconds so the game does not open with a crowd.
+`EnemySpawnPolicy` chooses which definition appears; `EnemySpawnSchedule` decides when and how many enemies to request. The arena starts with no enemies. Low-rate random arrivals become possible after 0.8 seconds, and the first group is scheduled at 3 seconds so the game does not open with a crowd while avoiding a long empty opening.
 
 `CompositeWaveSpawnSchedule` combines two independent rhythms. A smooth 120-second envelope moves from 0.75× at the start, to 1.25× at 60 seconds, and back to 0.75× at 120 seconds. Every five-second pulse has a 45% chance to request a group; its Poisson mean is 1.5 enemies, multiplied by the slow wave and a player-level factor. Pulse intervals receive up to ±0.3 seconds of jitter. Between pulses, a separate Poisson arrival process uses a base rate of 0.18 enemies per second, also scaled by those factors. Only living enemies count toward the cap of eight; requests beyond available slots are discarded.
 
@@ -55,7 +55,7 @@ For this prototype, the player-level factor is `min(1 + 0.04 × (level - 1), 1.4
 
 Public sources only describe the original threat system at a high level. The [Glyphica wiki](https://alias.black/glyphica/wiki_english.html) says threat rises over a run, Endless compares it with a player-level adaptive value, and special/elite enemies have class caps. A [developer interview](https://redharegames.wordpress.com/2025/02/03/game-talk-glyphica/) confirms that a central threat formula changes difficulty and density and that enemy types can be controlled by time brackets, but it does not publish the formula or its conversion to spawn counts. This implementation therefore does not invent a Threat progression or claim to reproduce that formula.
 
-Scheduled enemies begin outside one of the four viewport edges, at least their radius plus 12dp beyond it. Their caption follows their position from the moment they spawn; it is not projected to a separate handoff point or clamped to the viewport, so part or all of it can remain clipped until the enemy enters. Layout is selected once from the spawn origin: enemies originating in the upper half place their word 34dp below the body and their health bar above it, while lower-half spawns keep the word 22dp above and the health bar below. The chosen side remains fixed as the enemy moves across the arena.
+Scheduled enemies begin outside one of the four viewport edges, at least their effective radius plus 12dp beyond it. Each enemy has a numeric `size` multiplier; effective radius is base radius × size. Collision, spawn margins, body geometry, hit feedback, captions and health bars all use that effective size. Drone tiers use local shape tuning: circle, triangle, square, pentagon, hexagon, heptagon and octagon for tiers 1–7 respectively. Their caption follows their position from the moment they spawn; it is not projected to a separate handoff point or clamped to the viewport, so part or all of it can remain clipped until the enemy enters. Layout is selected once from the spawn origin: enemies originating in the upper half place their word 34dp below the body and their health bar above it, while lower-half spawns keep the word 22dp above and the health bar below. Font size, these offsets and health-bar dimensions scale with enemy size. The chosen side remains fixed as the enemy moves across the arena.
 
 ## Lifetimes and targeting
 
@@ -73,9 +73,9 @@ The damage number starts slightly above the enemy's top edge and drifts upward 1
 
 ## Drone tiers and mutations
 
-The [official enemy table](https://alias.black/glyphica/wiki_english.html) publishes seven Drone balance rows. In table order, their HP/contact damage are 80/40, 200/60, 500/90, 1,000/120, 1,800/150, 3,200/180, and 5,800/210. Absolute Drone speed is not published; all tiers therefore use the prototype base speed of 8.5dp/s.
+The [official enemy table](https://alias.black/glyphica/wiki_english.html) publishes seven Drone balance rows. In table order, their HP/contact damage are 80/40, 200/60, 500/90, 1,000/120, 1,800/150, 3,200/180, and 5,800/210. Absolute Drone speed is not published; all tiers therefore use the prototype base speed of 5.95dp/s, reduced from the earlier prototype value of 8.5dp/s.
 
-The same Wiki says Drones can appear enlarged or hastened: Enlarged triples HP, while Hastened doubles movement speed. It gives no mutation probability and does not say that the two forms can co-occur. This project keeps them mutually exclusive as requested and uses a configurable 5% combined chance per Drone spawn (2.5% for each form). Enlarged also uses a 1.5× radius so the size change is visible; that radius multiplier is local tuning, not a published value. Mutations do not change tier contact damage.
+The same Wiki says Drones can appear enlarged or hastened: Enlarged triples HP, while Hastened doubles movement speed. It gives no mutation probability and does not say that the two forms can co-occur. This project keeps them mutually exclusive as requested and uses a configurable 5% combined chance per Drone spawn (2.5% for each form). Every enemy stores a numeric size multiplier; Enlarged uses 1.5× size, which scales its effective radius, body, label and health bar. The size value and multiplier are local tuning, not published values. Mutations do not change tier contact damage.
 
 The Wiki describes Threat as rising during a run and says Endless uses the higher of Threat and a player-level adaptive value to determine spawn difficulty, but publishes neither the Threat formula nor tier thresholds. The local `DroneTierProgressionPolicy` leaves `Threat` untouched and selects `min(7, max(1 + floor(elapsedSeconds / 120), 1 + floor((playerLevel - 1) / 4)))`. Thus either two minutes of elapsed time or four player levels advances the tier; this is explicit prototype tuning, not a claim about the source game's exact rule.
 
@@ -88,9 +88,9 @@ The official [Update 12 announcement](https://steamcommunity.com/app/2400160/ann
 | Drone tiers HP / contact damage | 80/40, 200/60, 500/90, 1,000/120, 1,800/150, 3,200/180, 5,800/210 | Seven rows in the [official enemy table](https://alias.black/glyphica/wiki_english.html), checked 2026-10-30 |
 | Repeater kinetic damage / burst count | 35 / 3 | [Japanese community Wiki](https://wikiwiki.jp/glyphica/リピーター), checked 2026-10-30; secondary-source values, not independently measured |
 | Player HP | 300 | User's reference image; also appears in the official Wiki's health example |
-| Drone speed / radius | 8.5 logical dp/s / 4.5dp | Prototype screen tuning; public absolute values not verified. Enlarged uses 1.5× radius locally. |
+| Drone speed / base radius | 5.95 logical dp/s / 4.5dp | Prototype screen tuning; speed reduced to 70% of the previous 8.5dp/s. Enlarged uses 1.5× numeric size locally. |
 | Bullet speed / radius / shot interval | 520dp/s / 1.25dp / 120ms | Prototype screen tuning; public absolute values not verified |
-| Enemy count / spawn | No immediate enemies; eight alive maximum; 120s envelope, 5s groups, random trickle | Prototype wave tuning; exact source-game formula not public |
+| Enemy count / spawn | No immediate enemies; eight alive maximum; trickle starts at 0.8s, first group at 3s; 120s envelope, 5s groups | Prototype wave tuning; exact source-game formula not public |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |
 
 The default HP80 / damage35 requires three ordinary hits. A test injects damage40 to verify the user's two-hit-kill example still emits its third projectile. Crits, bleed and upgrades are deferred. The [lead developer's explanation](https://steamcommunity.com/app/2400160/discussions/0/591784375625107988/) confirms that the base Repeater has no range stat; bullets therefore leave only on contact or exiting the arena. Level changes update the HUD without weapon upgrades. Contact consumes a drone; HP0 stops combat and offers a tap to restart.

@@ -105,7 +105,7 @@ class CombatWorld(
             val applied = it.takeDamage(damage)
             if (applied > 0) {
                 val angle = incomingAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
-                mutableHitFeedback += HitFeedback(it.position, applied, it.definition.radius, angle, random)
+                mutableHitFeedback += HitFeedback(it.position, applied, it.radius, angle, random)
             }
             if (!it.isAlive) die(it, awardExperience = true)
         }
@@ -126,7 +126,7 @@ class CombatWorld(
         elapsedSeconds += dt
         mutableEnemies.filter { it.isAlive }.forEach { enemy ->
             enemy.advance(dt, player.position)
-            if ((enemy.position - player.position).length() <= enemy.definition.radius + player.radius) {
+            if ((enemy.position - player.position).length() <= enemy.radius + player.radius) {
                 player.takeDamage(enemy.definition.contactDamage)
                 die(enemy, awardExperience = false)
             }
@@ -142,7 +142,7 @@ class CombatWorld(
             projectile.advance(dt)
             val hit = mutableEnemies.asSequence().filter { it.isAlive }.mapNotNull { enemy ->
                 sweptCircleHit(projectile.previousPosition - enemy.previousPosition,
-                    projectile.position - enemy.position, projectile.radius + enemy.definition.radius)
+                    projectile.position - enemy.position, projectile.radius + enemy.radius)
                     ?.let { enemy to it }
             }.minByOrNull { it.second }
             if (hit != null) {
@@ -155,7 +155,7 @@ class CombatWorld(
                 if (applied > 0) {
                     val incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x)
                     mutableHitFeedback += HitFeedback(enemyPositionAtImpact, applied,
-                        hit.first.definition.radius, incomingAngle, random)
+                        hit.first.radius, incomingAngle, random)
                 }
                 if (!hit.first.isAlive) die(hit.first, awardExperience = true)
                 spent += projectile
@@ -168,7 +168,7 @@ class CombatWorld(
         val requestedSpawns = spawnSchedule.update(dt, elapsedSeconds, level, random)
         repeat(requestedSpawns.coerceAtMost(availableSlots)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level, random)
-            spawnEnemy(spawnPosition(definition.radius), definition)
+            spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
         }
     }
 

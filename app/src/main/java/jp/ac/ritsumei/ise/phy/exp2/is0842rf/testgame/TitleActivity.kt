@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -51,10 +52,11 @@ class TitleActivity : AppCompatActivity() {
         backdrop = MenuBackdropView(this)
         root.addView(backdrop, fill())
         content = TitleMenuView(this)
-        viewport = ScrollView(this).apply {
+        viewport = LockedScrollView(this).apply {
             isFillViewport = true
             isVerticalScrollBarEnabled = false
             clipToPadding = false
+            overScrollMode = View.OVER_SCROLL_NEVER
             addView(content, ViewGroup.LayoutParams(-1, -2))
         }
         root.addView(viewport, fill())
@@ -264,4 +266,13 @@ class TitleActivity : AppCompatActivity() {
         const val TYPE_INTERVAL_MS = 50L
         const val ZOOM_DURATION_MS = 420L
     }
+}
+
+/** Keeps the title composition fixed while allowing its menu children to receive taps. */
+private class LockedScrollView(context: android.content.Context) : ScrollView(context) {
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean = false
+    override fun onTouchEvent(ev: MotionEvent): Boolean = false
+    override fun requestChildRectangleOnScreen(child: View, rectangle: android.graphics.Rect,
+                                               immediate: Boolean): Boolean = false
+    override fun scrollTo(x: Int, y: Int) = super.scrollTo(x, 0)
 }
