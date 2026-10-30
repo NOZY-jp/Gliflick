@@ -150,7 +150,7 @@ class CombatRenderer(context: Context) {
             val length = fragment.lengthAt(feedback.age)
             if (length > 0.05f) {
                 val center = fragment.positionAt(feedback.origin, feedback.age)
-                paint.color = ink
+                paint.color = muted
                 paint.alpha = 255
                 paint.style = Paint.Style.FILL
                 canvas.save()
