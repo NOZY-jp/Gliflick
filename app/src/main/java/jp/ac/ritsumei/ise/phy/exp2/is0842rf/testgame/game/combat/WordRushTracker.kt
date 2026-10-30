@@ -7,27 +7,29 @@ import kotlin.math.roundToInt
  * separate so it can be adjusted without changing input matching or weapon code.
  */
 data class WordRushDefinition(
-    val wordsToActivate: Int = 3,
-    val secondsPerReadingCharacter: Double = 0.55,
-    val activeSeconds: Double = 2.0,
-    val rateOfFireBonus: Float = 0.25f
+    val stacksToActivate: Int = 5,
+    val completionWindowSeconds: Double = 10.0,
+    val activeSeconds: Double = 10.0,
+    val rateOfFireBonus: Float = 0.5f
 ) {
     init {
-        require(wordsToActivate >= 2)
-        require(secondsPerReadingCharacter > 0.0 && secondsPerReadingCharacter.isFinite())
+        require(stacksToActivate >= 1)
+        require(completionWindowSeconds > 0.0 && completionWindowSeconds.isFinite())
         require(activeSeconds > 0.0 && activeSeconds.isFinite())
         require(rateOfFireBonus >= 0f && rateOfFireBonus.isFinite())
     }
 }
 
 data class CombatTypingBonusDefinition(
-    val criticalChancePerReadingCharacter: Float = 0.01f,
-    val maximumCriticalStreakCharacters: Int = 5,
+    val criticalChancePerStreakStep: Float = 0.01f,
+    val readingCharactersPerCriticalStep: Int = 20,
+    val maximumCriticalStreakSteps: Int = 5,
     val wordRush: WordRushDefinition = WordRushDefinition()
 ) {
     init {
-        require(criticalChancePerReadingCharacter >= 0f && criticalChancePerReadingCharacter.isFinite())
-        require(maximumCriticalStreakCharacters >= 0)
+        require(criticalChancePerStreakStep >= 0f && criticalChancePerStreakStep.isFinite())
+        require(readingCharactersPerCriticalStep > 0)
+        require(maximumCriticalStreakSteps >= 0)
     }
 }
 
@@ -37,40 +39,34 @@ data class CombatTypingBonusStatus(
     val criticalChanceBonusPercent: Int,
     val maximumCriticalChanceBonusPercent: Int,
     val isWordRushActive: Boolean,
+    val wordRushStacks: Int,
     val wordRushProgress: Float,
     val rateOfFireBonusPercent: Int
 )
 
-/** Tracks only successful, live-target word completions; the shared matcher owns correctness. */
+/** Tracks completed live-target words; the shared matcher owns correctness. */
 class WordRushTracker(val definition: WordRushDefinition = WordRushDefinition()) {
-    private var consecutiveFastWords = 0
+    private var rapidFireStacks = 0
     private var lastCompletionTime: Double? = null
     private var activeUntil: Double? = null
 
     fun isActiveAt(timeSeconds: Double) = activeUntil?.let { timeSeconds < it } ?: false
 
-    fun onWordCompleted(readingLength: Int, timeSeconds: Double) {
-        require(readingLength > 0)
+    fun onWordCompleted(timeSeconds: Double) {
         require(timeSeconds >= 0.0 && timeSeconds.isFinite())
 
         val previous = lastCompletionTime
-        val maximumGap = readingLength * definition.secondsPerReadingCharacter
-        if (previous != null && timeSeconds - previous <= maximumGap) {
-            consecutiveFastWords++
+        if (previous != null && timeSeconds - previous <= definition.completionWindowSeconds) {
+            rapidFireStacks = minOf(rapidFireStacks + 1, definition.stacksToActivate)
         } else {
-            consecutiveFastWords = 1
+            rapidFireStacks = 0
         }
         lastCompletionTime = timeSeconds
 
-        if (consecutiveFastWords >= definition.wordsToActivate) {
+        if (rapidFireStacks >= definition.stacksToActivate) {
             activeUntil = timeSeconds + definition.activeSeconds
+            rapidFireStacks = 0
         }
-    }
-
-    fun onMistype() {
-        consecutiveFastWords = 0
-        lastCompletionTime = null
-        activeUntil = null
     }
 
     fun progressAt(timeSeconds: Double): Float {
@@ -97,29 +93,33 @@ class CombatTypingBonusTracker(val definition: CombatTypingBonusDefinition = Com
 
     fun isWordRushActiveAt(timeSeconds: Double) = wordRush.isActiveAt(timeSeconds)
 
-    fun onWordCompleted(readingLength: Int, timeSeconds: Double) =
-        wordRush.onWordCompleted(readingLength, timeSeconds)
-
-    fun onMistype() = wordRush.onMistype()
+    fun onWordCompleted(timeSeconds: Double) = wordRush.onWordCompleted(timeSeconds)
 
     fun modifiers(streak: Int, timeSeconds: Double): WeaponRuntimeModifiers {
-        val critBonus = minOf(streak, definition.maximumCriticalStreakCharacters) *
-            definition.criticalChancePerReadingCharacter
+        val criticalSteps = minOf(
+            streak / definition.readingCharactersPerCriticalStep,
+            definition.maximumCriticalStreakSteps
+        )
+        val critBonus = criticalSteps * definition.criticalChancePerStreakStep
         val rateMultiplier = wordRush.rateOfFireMultiplier(timeSeconds)
         return WeaponRuntimeModifiers(critBonus, rateMultiplier)
     }
 
     fun status(streak: Int, timeSeconds: Double): CombatTypingBonusStatus {
-        val criticalBonus = minOf(streak, definition.maximumCriticalStreakCharacters) *
-            definition.criticalChancePerReadingCharacter
-        val maximumCriticalBonus = definition.maximumCriticalStreakCharacters *
-            definition.criticalChancePerReadingCharacter
+        val criticalSteps = minOf(
+            streak / definition.readingCharactersPerCriticalStep,
+            definition.maximumCriticalStreakSteps
+        )
+        val criticalBonus = criticalSteps * definition.criticalChancePerStreakStep
+        val maximumCriticalBonus = definition.maximumCriticalStreakSteps * definition.criticalChancePerStreakStep
         val rateMultiplier = wordRush.rateOfFireMultiplier(timeSeconds)
+        val wordRushActive = rateMultiplier > 1f
         return CombatTypingBonusStatus(
             streakCharacters = streak,
             criticalChanceBonusPercent = (criticalBonus * 100f).roundToInt(),
             maximumCriticalChanceBonusPercent = (maximumCriticalBonus * 100f).roundToInt(),
-            isWordRushActive = rateMultiplier > 1f,
+            isWordRushActive = wordRushActive,
+            wordRushStacks = if (wordRushActive) definition.wordRush.stacksToActivate else 0,
             wordRushProgress = wordRush.progressAt(timeSeconds),
             rateOfFireBonusPercent = (definition.wordRush.rateOfFireBonus * 100f).roundToInt()
         )

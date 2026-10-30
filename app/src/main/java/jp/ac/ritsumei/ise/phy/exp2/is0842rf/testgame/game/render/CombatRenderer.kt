@@ -297,7 +297,7 @@ class CombatRenderer(context: Context) {
         var row = 0
 
         if (showStreak) {
-            centered(canvas, "完璧な入力 ×${status.streakCharacters}  クリ率 +${status.criticalChanceBonusPercent}%",
+            centered(canvas, "正射 ×${status.streakCharacters} Crit率 +${status.criticalChanceBonusPercent}%",
                 centerX, firstBaseline, 8.5f, muted)
             drawBuffMeter(canvas, centerX, firstBaseline + 4f, barWidth,
                 status.criticalChanceBonusPercent.toFloat() /
@@ -307,7 +307,7 @@ class CombatRenderer(context: Context) {
 
         if (showWordRush) {
             val baseline = firstBaseline + row * rowGap
-            centered(canvas, "速打ち  連射 +${status.rateOfFireBonusPercent}%",
+            centered(canvas, "速射 ×${status.wordRushStacks}  連射速度 +${status.rateOfFireBonusPercent}%",
                 centerX, baseline, 8.5f, ink)
             drawBuffMeter(canvas, centerX, baseline + 4f, barWidth, status.wordRushProgress)
         }

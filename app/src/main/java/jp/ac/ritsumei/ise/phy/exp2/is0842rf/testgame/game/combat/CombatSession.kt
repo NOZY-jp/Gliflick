@@ -83,14 +83,12 @@ class CombatSession(
         if (apply) {
             pendingTokens = emptyList()
             tokens.forEach { token ->
-                val previousMistypeCount = engine.mistypeCount
                 val completed = engine.accept(token)
-                if (engine.mistypeCount > previousMistypeCount) typingBonuses.onMistype()
                 overlaps += engine.lastOverlapEvents
                 completed.forEach { word ->
                     completedAny = true
                     if (mutableCaptions.any { it.word.id == word.id && !it.retired }) {
-                        typingBonuses.onWordCompleted(word.readingLength, world.elapsedSeconds)
+                        typingBonuses.onWordCompleted(world.elapsedSeconds)
                     }
                     complete(word.id)
                 }
