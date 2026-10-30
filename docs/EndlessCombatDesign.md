@@ -10,7 +10,7 @@ Play opens combat immediately. A fixed central player, elapsed timer, level, lin
 
 - `EnemyDefinition` separates kind, variant, shape and fixed balance. Each `Enemy` creates its own `EnemyBehavior` and `Durability`; pursuit and ordinary HP are the current implementations. Shields or immunity can replace durability without changing projectile collision.
 - `MainWeapon` is the targeting/update contract; `RepeaterDefinition` and `ProjectileDefinition` hold its balance. Weapons emit `WeaponAction` commands; the world resolves those commands. A future beam or area effect adds a command/handler without changing input transport or the activity.
-- `EnemySpawnPolicy` selects definitions from elapsed time and player level. The current policy selects only a normal drone; new enemy selection does not belong in the renderer or keyboard controller.
+- `EnemySpawnPolicy` selects enemy definitions, while `EnemySpawnSchedule` independently selects spawn counts and timing. The current definition policy selects only a normal drone; neither decision belongs in the renderer or keyboard controller.
 - `WordDefinition.readingLength` is derived from the reading, and `WordLengthPolicy` selects a length before `CombatSession` chooses a word from that group. The length schedule does not depend on enemy type or weapon.
 - `CombatWorld` advances movement, scheduled shots, swept circle collisions, spawning, damage, XP and death effects. It has no Android or IME dependencies.
 - `CombatSession` connects world events to dynamic word targets and caption animations. Enemy lifetime and caption lifetime are independent.
@@ -45,6 +45,18 @@ The curated list contains 1,625 entries; every reading-length group has at least
 | 12 min | 2–6 | 5.0 |
 | 16 min onward | 2–7 | 6.0 |
 
+## Enemy spawn waves and entry captions
+
+`EnemySpawnPolicy` chooses which definition appears; `EnemySpawnSchedule` decides when and how many enemies to request. The arena starts with no enemies. Low-rate random arrivals become possible after 1.5 seconds, and the first group is scheduled at 5 seconds so the game does not open with a crowd.
+
+`CompositeWaveSpawnSchedule` combines two independent rhythms. A smooth 120-second envelope moves from 0.75× at the start, to 1.25× at 60 seconds, and back to 0.75× at 120 seconds. A short pulse requests a random group about every five seconds: its Poisson mean starts at three enemies and is multiplied by the slow wave and a player-level factor. Pulse intervals receive up to ±0.3 seconds of jitter. Between pulses, a separate Poisson arrival process uses a base rate of 0.15 enemies per second, also scaled by those factors. Only living enemies count toward the cap of eight; requests beyond available slots are discarded.
+
+For this prototype, the player-level factor is `min(1 + 0.08 × (level - 1), 2)`. This is an explicit, editable game-tuning choice, not a recovered Glyphica formula. The current `Threat` value is a placeholder at zero and has no effect on scheduling.
+
+Public sources only describe the original threat system at a high level. The [Glyphica wiki](https://alias.black/glyphica/wiki_english.html) says threat rises over a run, Endless compares it with a player-level adaptive value, and special/elite enemies have class caps. A [developer interview](https://redharegames.wordpress.com/2025/02/03/game-talk-glyphica/) confirms that a central threat formula changes difficulty and density and that enemy types can be controlled by time brackets, but it does not publish the formula or its conversion to spawn counts. This implementation therefore does not invent a Threat progression or claim to reproduce that formula.
+
+Scheduled enemies begin outside one of the four viewport edges, at least their radius plus 12dp beyond it. Each caption is placed immediately at its projected, fully visible handoff point, 72dp inside the corresponding edge (with a smaller-screen floor of 48dp). It stays there while the enemy enters, then begins following when the enemy crosses that point. The renderer keeps the complete word and its formal label inside the viewport during both stages.
+
 ## Lifetimes and targeting
 
 Completion queues three shots in FIFO burst order, with 120ms between shots. Each shot samples the living target's position once and then travels without homing. If the target has died, remaining shots use its last known aim point. Collision selects the earliest intersected live body, independently of the selected target; relative swept-circle tests prevent tunnelling through moving drones.
@@ -68,7 +80,7 @@ The damage number starts slightly above the enemy's top edge and drifts upward 1
 | Player HP | 300 | User's reference image; also appears in the official Wiki's health example |
 | Drone speed / radius | 8.5 logical dp/s / 4.5dp | Prototype screen tuning; public absolute values not verified |
 | Bullet speed / radius / shot interval | 520dp/s / 1.25dp / 120ms | Prototype screen tuning; public absolute values not verified |
-| Enemy count / spawn | Six initial, eight maximum, 2.8s | Prototype population limit |
+| Enemy count / spawn | No immediate enemies; eight alive maximum; 120s envelope, 5s groups, random trickle | Prototype wave tuning; exact source-game formula not public |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |
 
 The default HP80 / damage35 requires three ordinary hits. A test injects damage40 to verify the user's two-hit-kill example still emits its third projectile. Crits, bleed and upgrades are deferred. The [lead developer's explanation](https://steamcommunity.com/app/2400160/discussions/0/591784375625107988/) confirms that the base Repeater has no range stat; bullets therefore leave only on contact or exiting the arena. Level changes update the HUD without weapon upgrades. Contact consumes a drone; HP0 stops combat and offers a tap to restart.

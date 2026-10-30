@@ -84,10 +84,10 @@ class CombatRenderer(context: Context) {
             canvas.drawCircle(bullet.position.x, bullet.position.y, bullet.radius, paint)
         }
         drawPlayer(canvas, world)
-        session.captions.forEach { drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width) }
+        session.captions.forEach { drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, height) }
         session.completions.forEach {
             val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
-            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width)
+            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, height)
         }
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
@@ -197,7 +197,7 @@ class CombatRenderer(context: Context) {
     }
 
     private fun drawCaption(canvas: Canvas, state: WordMatchState, anchor: Vec2, alpha: Float,
-                            scale: Float, arenaWidth: Float) {
+                            scale: Float, arenaWidth: Float, arenaHeight: Float) {
         if (alpha <= 0f) return
         paint.typeface = light
         paint.textAlign = Paint.Align.LEFT
@@ -205,11 +205,23 @@ class CombatRenderer(context: Context) {
         val maxWidth = min(210f, arenaWidth - 20f)
         val naturalWidth = paint.measureText(state.inputText).coerceAtLeast(1f)
         if (naturalWidth > maxWidth) paint.textSize *= maxWidth / naturalWidth
+        val wordTextSize = paint.textSize
         val textWidth = paint.measureText(state.inputText)
         val centerX = anchor.x.coerceIn(textWidth / 2f + 8f, arenaWidth - textWidth / 2f - 8f)
-        val centerY = anchor.y - 22f
+        val wordMetrics = paint.fontMetrics
+        paint.textSize = 10.5f
+        val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
+        if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
+        val labelMetrics = paint.fontMetrics
+        val topOffset = min(wordMetrics.ascent, -16f + labelMetrics.ascent)
+        val bottomOffset = max(wordMetrics.descent, -16f + labelMetrics.descent)
+        val minCenterY = 8f - topOffset
+        val maxCenterY = (arenaHeight - 8f - bottomOffset).coerceAtLeast(minCenterY)
+        val centerY = (anchor.y - 22f).coerceIn(minCenterY, maxCenterY)
         canvas.save()
         canvas.scale(scale, scale, centerX, centerY)
+        paint.textSize = wordTextSize
+        paint.textAlign = Paint.Align.LEFT
         val baseline = centerY - (paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f
         var x = centerX - textWidth / 2f
         splitTextCharacters(state.inputText).forEachIndexed { index, character ->
@@ -219,8 +231,8 @@ class CombatRenderer(context: Context) {
             x += paint.measureText(character)
         }
         paint.textSize = 10.5f
-        val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
-        if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
+        val fittedLabelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
+        if (fittedLabelWidth > maxWidth) paint.textSize *= maxWidth / fittedLabelWidth
         paint.textAlign = Paint.Align.CENTER
         paint.color = muted
         paint.alpha = (255f * alpha).toInt().coerceIn(0, 255)

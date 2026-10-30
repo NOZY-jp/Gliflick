@@ -7,9 +7,17 @@ data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExp
                                  val experienceIncreasePerLevel: Int = 20) {
     init { require(killExperience >= 0 && firstLevelExperience > 0 && experienceIncreasePerLevel >= 0) }
 }
-data class CombatConfig(val initialEnemies: Int = 6, val maxEnemies: Int = 8, val spawnInterval: Float = 2.8f,
-                        val playerMaxHp: Int = 300, val progression: ProgressionDefinition = ProgressionDefinition()) {
-    init { require(initialEnemies in 0..maxEnemies && spawnInterval > 0f && playerMaxHp > 0) }
+data class CombatConfig(val maxEnemies: Int = 8, val playerMaxHp: Int = 300,
+                        val progression: ProgressionDefinition = ProgressionDefinition()) {
+    init { require(maxEnemies >= 0 && playerMaxHp > 0) }
+
+    @Deprecated("Initial waves are controlled by EnemySpawnSchedule.")
+    constructor(initialEnemies: Int, maxEnemies: Int = 8, spawnInterval: Float = 2.8f,
+                playerMaxHp: Int = 300, progression: ProgressionDefinition = ProgressionDefinition()) :
+        this(maxEnemies, playerMaxHp, progression) {
+        require(initialEnemies == 0) { "Immediate enemy spawns have been removed." }
+        require(spawnInterval > 0f)
+    }
 }
 
 fun interface EnemySpawnPolicy {
@@ -29,7 +37,8 @@ class CombatWorld(
     val config: CombatConfig = CombatConfig(),
     private val random: Random = Random.Default,
     private val spawnPolicy: EnemySpawnPolicy = FixedEnemySpawnPolicy(),
-    val mainWeapon: MainWeapon = Repeater()
+    val mainWeapon: MainWeapon = Repeater(),
+    private val spawnSchedule: EnemySpawnSchedule = CompositeWaveSpawnSchedule()
 ) {
     val player = Player(config.playerMaxHp)
     private val mutableEnemies = mutableListOf<Enemy>()
@@ -42,13 +51,15 @@ class CombatWorld(
     val hitFeedback: List<HitFeedback> get() = mutableHitFeedback
     private val events = mutableListOf<CombatEvent>()
     private var nextEnemyId = 1L
-    private var spawnClock = 0f
     var width = 0f; private set
     var height = 0f; private set
     var elapsedSeconds = 0.0; private set
     var level = 1; private set
     var experience = 0; private set
     var kills = 0; private set
+    /** Placeholder until the public Threat formula and its mapping to spawns are known. */
+    var threat: Threat = Threat.NONE
+        private set
     val nextLevelExperience get() = config.progression.firstLevelExperience +
         (level - 1) * config.progression.experienceIncreasePerLevel
     val experienceFraction get() = experience.toFloat() / nextLevelExperience
@@ -73,11 +84,11 @@ class CombatWorld(
         width = newWidth
         height = newHeight
         player.position = Vec2(width / 2f, height / 2f)
-        if (first) repeat(config.initialEnemies) { spawnEnemy(spawnPosition()) }
     }
 
-    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level)): Enemy =
-        Enemy(nextEnemyId++, definition, position).also {
+    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level),
+                   spawnEdge: SpawnEdge? = null): Enemy =
+        Enemy(nextEnemyId++, definition, position, spawnEdge).also {
         mutableEnemies += it
         events += CombatEvent.Spawned(it)
     }
@@ -149,10 +160,13 @@ class CombatWorld(
                 projectile.position.y !in -32f..height + 32f) spent += projectile
         }
         mutableProjectiles.removeAll(spent)
-        spawnClock += dt
-        if (spawnClock >= config.spawnInterval) {
-            spawnClock %= config.spawnInterval
-            if (mutableEnemies.count { it.isAlive } < config.maxEnemies) spawnEnemy(spawnPosition())
+        val livingCount = mutableEnemies.count { it.isAlive }
+        val availableSlots = (config.maxEnemies - livingCount).coerceAtLeast(0)
+        val requestedSpawns = spawnSchedule.update(dt, elapsedSeconds, level, random)
+        repeat(requestedSpawns.coerceAtMost(availableSlots)) {
+            val definition = spawnPolicy.choose(elapsedSeconds, level)
+            val point = spawnPoint(definition.radius)
+            spawnEnemy(point.position, definition, point.edge)
         }
     }
 
@@ -170,18 +184,25 @@ class CombatWorld(
         }
     }
 
-    private fun spawnPosition(): Vec2 {
-        val top = 124f.coerceAtMost(height * 0.36f)
-        fun candidate(): Vec2 = when (random.nextInt(4)) {
-            0 -> Vec2(28f + random.nextFloat() * (width - 56f).coerceAtLeast(1f), top)
-            1 -> Vec2(width - 24f, top + random.nextFloat() * (height - top - 24f).coerceAtLeast(1f))
-            2 -> Vec2(28f + random.nextFloat() * (width - 56f).coerceAtLeast(1f), height - 24f)
-            else -> Vec2(24f, top + random.nextFloat() * (height - top - 24f).coerceAtLeast(1f))
+    private data class SpawnPoint(val position: Vec2, val edge: SpawnEdge)
+
+    private fun spawnPoint(radius: Float): SpawnPoint {
+        val margin = radius + 12f
+        fun across(limit: Float): Float {
+            val low = margin.coerceAtMost(limit / 2f)
+            val high = (limit - margin).coerceAtLeast(low)
+            return if (high <= low) limit / 2f else low + random.nextFloat() * (high - low)
         }
-        // Prefer clear perimeter slots so the first wave's labels remain readable.
+        fun candidate(): SpawnPoint = when (random.nextInt(4)) {
+            0 -> SpawnPoint(Vec2(across(width), -margin), SpawnEdge.TOP)
+            1 -> SpawnPoint(Vec2(width + margin, across(height)), SpawnEdge.RIGHT)
+            2 -> SpawnPoint(Vec2(across(width), height + margin), SpawnEdge.BOTTOM)
+            else -> SpawnPoint(Vec2(-margin, across(height)), SpawnEdge.LEFT)
+        }
         return List(32) { candidate() }.maxBy { point ->
-            minOf((point - player.position).length(),
-                mutableEnemies.filter { it.isAlive }.minOfOrNull { (point - it.position).length() } ?: Float.MAX_VALUE)
+            minOf((point.position - player.position).length(),
+                mutableEnemies.filter { it.isAlive }
+                    .minOfOrNull { (point.position - it.position).length() } ?: Float.MAX_VALUE)
         }
     }
 

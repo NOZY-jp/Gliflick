@@ -22,7 +22,7 @@
 | Projectile | 弾1発の実行時状態。発射元、位置、速度、ダメージ、当たり判定などが候補。Repeaterの弾とシューターミサイルを同じ弾クラスにするかは未決。 |
 | WarderBarrier | ウォーダーに紐づく回転バリア。敵本体とは別の衝突エンティティとして扱う案。所有者死亡時に消滅する。 |
 
-現在は`EnemyKind`（役割）、`EnemyVariant`（形態）、`EnemyShape`（外形）を分離。固定値は`EnemyDefinition`、個体の行動は`EnemyBehavior`、耐久値処理は`Durability`へ分ける。現時点の実装はDRONE / NORMAL / CIRCLEだけ。武器は`MainWeapon`契約と個別の設定・発射方式へ分け、出現内容は`EnemySpawnPolicy`から供給する。
+現在は`EnemyKind`（役割）、`EnemyVariant`（形態）、`EnemyShape`（外形）を分離。固定値は`EnemyDefinition`、個体の行動は`EnemyBehavior`、耐久値処理は`Durability`へ分ける。現時点の実装はDRONE / NORMAL / CIRCLEだけ。武器は`MainWeapon`契約と個別の設定・発射方式へ分ける。出現する敵定義は`EnemySpawnPolicy`、出現数とタイミングは`EnemySpawnSchedule`から供給する。Threatは値と効果が未定義の拡張用モデルとし、現段階では出現へ使わない。
 
 ## 敵の要件
 
@@ -71,7 +71,7 @@
 
 ## 参考にする公開仕様と取り込まない複雑性
 
-2026-10-29に確認した[Glyphica公式Wiki](https://alias.black/glyphica/wiki_english.html)では、敵のThreatに基づく手続き的な出現、敵クラスごとの出現上限、多数の敵、各種派生や進行値が説明されている。本プロジェクトでは、これらの内部構成や進行システムを再現する根拠にはしない。
+公開されている[Glyphica Wiki](https://alias.black/glyphica/wiki_english.html)は、時間で増えるThreat、EndlessにおけるThreatとプレイヤーレベル由来の適応値の比較、特殊・エリート敵のクラス上限を説明している。[開発者インタビュー](https://redharegames.wordpress.com/2025/02/03/game-talk-glyphica/)もThreatの式が敵の難易度と密度を進行させることを示すが、計算式や出現数への換算値は公表していない。本プロジェクトはその未公開式を推測せず、Threatを未使用の型として保持する。出現数のプレイヤーレベル補正はプロトタイプ独自の調整値で、原作式の再現とは扱わない。
 
 参考値として、公式Wikiの敵バリアント一覧には次の範囲が掲載されている。初期バランス値として採用したものではない。
 
@@ -82,7 +82,7 @@
 | シューター | HP 300〜7,200、ダメージ 25 |
 | ウォーダー | HP 300 |
 
-出典の表は複数のバリアント値を列挙している。本プロジェクトでは最初に必要な種類・バリアントだけを選び、ゲームが成立する少数の値で開始する。正確な値、出現率、出現進行、敵数の上限、武器強化ツリー、状態異常、他の敵種は後回し。
+出典の表は複数のバリアント値を列挙している。本プロジェクトでは最初に必要な種類・バリアントだけを選び、ゲームが成立する少数の値で開始する。出現率・出現進行は独立した`EnemySpawnSchedule`の暫定値を用いる。Threatの増加やプレイヤーレベルとの比較式は未実装。武器強化ツリー、状態異常、他の敵種は後回し。
 
 ## 実装時の確認項目
 
