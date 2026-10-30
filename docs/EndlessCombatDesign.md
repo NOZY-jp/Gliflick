@@ -26,13 +26,13 @@ The pool is grouped by `readingLength` and currently contains:
 | Reading length | Words |
 | ---: | ---: |
 | 2 | 108 |
-| 3 | 172 |
-| 4 | 164 |
-| 5 | 103 |
+| 3 | 516 |
+| 4 | 492 |
+| 5 | 309 |
 | 6 | 100 |
 | 7 | 100 |
 
-The curated list contains 747 entries; every reading-length group has at least 100 candidates. It uses standalone words and established compounds, excludes する-verbs, and limits particle-bearing expressions to the two requested idioms, 「黄泉の国」 and 「虎の巻」.
+The curated list contains 1,625 entries; every reading-length group has at least 100 candidates. The three-, four-, and five-character groups were each expanded to three times their previous counts. It uses standalone words and established compounds, excludes する-verbs, and limits particle-bearing expressions to the two requested idioms, 「黄泉の国」 and 「虎の巻」.
 
 `ProgressiveGaussianWordLengthPolicy` controls which groups are available and the Gaussian centre. The maximum starts at three and increases once every four minutes, reaching seven at 16 minutes. The centre starts at two and increases by 0.5 once every two minutes, reaching six at 16 minutes. Standard deviation starts at one and is configurable. For each available length `n`, the policy uses `exp(-0.5 * ((n - centre) / standardDeviation)^2)` and normalizes across the unlocked groups that contain unused words. It chooses a length first, then selects uniformly within that group so group size does not multiply the length probability. At the boundaries, truncating a discrete distribution means the observed sample average may differ slightly from its centre.
 
