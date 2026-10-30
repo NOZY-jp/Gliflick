@@ -129,9 +129,9 @@ class CombatRenderer(context: Context) {
 
     private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int, aboveEnemy: Boolean) {
         if (enemy.hp >= enemy.definition.maxHp) return
-        val width = max(12f * enemy.size, enemy.radius * 2.6f) * 2f
+        val width = max(12f, enemy.definition.radius * 2.6f) * 2f
         val left = enemy.position.x - width / 2f
-        val barHeight = 1.5f * enemy.size
+        val barHeight = 1.5f
         val gap = 8f * enemy.size
         val top = if (aboveEnemy) enemy.position.y - enemy.radius - gap - barHeight
         else enemy.position.y + enemy.radius + gap
@@ -286,14 +286,14 @@ class CombatRenderer(context: Context) {
         if (alpha <= 0f) return
         paint.typeface = light
         paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 17f * enemySize
-        val maxWidth = min(210f * enemySize, arenaWidth - 20f)
+        paint.textSize = 17f
+        val maxWidth = min(210f, arenaWidth - 20f)
         val naturalWidth = paint.measureText(state.inputText).coerceAtLeast(1f)
         if (naturalWidth > maxWidth) paint.textSize *= maxWidth / naturalWidth
         val wordTextSize = paint.textSize
         val textWidth = paint.measureText(state.inputText)
         val centerX = anchor.x
-        paint.textSize = 10.5f * enemySize
+        paint.textSize = 10.5f
         val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
         val centerY = anchor.y + (if (placeBelowEnemy) 34f else -22f) * enemySize
@@ -309,7 +309,7 @@ class CombatRenderer(context: Context) {
             canvas.drawText(character, x, baseline, paint)
             x += paint.measureText(character)
         }
-        paint.textSize = 10.5f * enemySize
+        paint.textSize = 10.5f
         val fittedLabelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
         if (fittedLabelWidth > maxWidth) paint.textSize *= maxWidth / fittedLabelWidth
         paint.textAlign = Paint.Align.CENTER

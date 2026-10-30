@@ -5,26 +5,25 @@ import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 
-/** Public balance values and image-derived appearance data for one Drone tier. */
+/** Published balance values and Wiki-derived appearance motif for one Drone tier. */
 data class DroneTierDefinition(
     val tier: Int,
     val maxHp: Int,
     val contactDamage: Int,
-    val markerPattern: EnemyMarkerPattern,
-    val sizeScale: Float
+    val markerPattern: EnemyMarkerPattern
 ) {
-    init { require(tier > 0 && maxHp > 0 && contactDamage >= 0 && sizeScale > 0f) }
+    init { require(tier > 0 && maxHp > 0 && contactDamage >= 0) }
 }
 
 object DroneTierCatalog {
     val tiers = listOf(
-        DroneTierDefinition(1, 80, 40, EnemyMarkerPattern.DOT, 1f),
-        DroneTierDefinition(2, 200, 60, EnemyMarkerPattern.RINGED_DOT, 2f),
-        DroneTierDefinition(3, 500, 90, EnemyMarkerPattern.DOUBLE_RINGED_DOT, 2.83f),
-        DroneTierDefinition(4, 1_000, 120, EnemyMarkerPattern.BULLSEYE, 2.83f),
-        DroneTierDefinition(5, 1_800, 150, EnemyMarkerPattern.CENTER_HOLE, 2.83f),
-        DroneTierDefinition(6, 3_200, 180, EnemyMarkerPattern.SEGMENTED_CENTER_HOLE, 3f),
-        DroneTierDefinition(7, 5_800, 210, EnemyMarkerPattern.RINGED_SEGMENTED_CENTER_HOLE, 3.33f)
+        DroneTierDefinition(1, 80, 40, EnemyMarkerPattern.DOT),
+        DroneTierDefinition(2, 200, 60, EnemyMarkerPattern.RINGED_DOT),
+        DroneTierDefinition(3, 500, 90, EnemyMarkerPattern.DOUBLE_RINGED_DOT),
+        DroneTierDefinition(4, 1_000, 120, EnemyMarkerPattern.BULLSEYE),
+        DroneTierDefinition(5, 1_800, 150, EnemyMarkerPattern.CENTER_HOLE),
+        DroneTierDefinition(6, 3_200, 180, EnemyMarkerPattern.SEGMENTED_CENTER_HOLE),
+        DroneTierDefinition(7, 5_800, 210, EnemyMarkerPattern.RINGED_SEGMENTED_CENTER_HOLE)
     )
 
     val highestPublishedTier get() = tiers.last().tier
@@ -39,7 +38,7 @@ object DroneTierCatalog {
             speed = BASE_SPEED * mutation.speedMultiplier,
             contactDamage = balance.contactDamage,
             radius = BASE_RADIUS,
-            size = balance.sizeScale * mutation.sizeMultiplier,
+            size = mutation.sizeMultiplier,
             tier = balance.tier,
             mutation = mutation
         )
