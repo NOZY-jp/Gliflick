@@ -97,6 +97,7 @@ class CombatRenderer(context: Context) {
         }
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
+        drawTypingBonuses(canvas, session, width)
         if (world.isGameOver) {
             paint.color = Color.argb(200, 239, 239, 229)
             canvas.drawRect(0f, 0f, width, height, paint)
@@ -281,6 +282,44 @@ class CombatRenderer(context: Context) {
         canvas.drawRect(width / 2f - 48f, 64f, width / 2f + 48f, 68f, paint)
         paint.color = Color.rgb(117, 117, 110)
         canvas.drawRect(width / 2f - 48f, 64f, width / 2f - 48f + 96f * world.experienceFraction, 68f, paint)
+    }
+
+    private fun drawTypingBonuses(canvas: Canvas, session: CombatSession, width: Float) {
+        val status = session.typingBonusStatus
+        val showStreak = status.streakCharacters > 20
+        val showWordRush = status.isWordRushActive
+        if (!showStreak && !showWordRush) return
+
+        val centerX = session.world.player.position.x
+        val firstBaseline = session.world.player.position.y + 62f
+        val rowGap = 17f
+        val barWidth = min(38f, (width - 24f).coerceAtLeast(12f))
+        var row = 0
+
+        if (showStreak) {
+            centered(canvas, "完璧な入力 ×${status.streakCharacters}  クリ率 +${status.criticalChanceBonusPercent}%",
+                centerX, firstBaseline, 8.5f, muted)
+            drawBuffMeter(canvas, centerX, firstBaseline + 4f, barWidth,
+                status.criticalChanceBonusPercent.toFloat() /
+                    status.maximumCriticalChanceBonusPercent.coerceAtLeast(1))
+            row++
+        }
+
+        if (showWordRush) {
+            val baseline = firstBaseline + row * rowGap
+            centered(canvas, "速打ち  連射 +${status.rateOfFireBonusPercent}%",
+                centerX, baseline, 8.5f, ink)
+            drawBuffMeter(canvas, centerX, baseline + 4f, barWidth, status.wordRushProgress)
+        }
+    }
+
+    private fun drawBuffMeter(canvas: Canvas, centerX: Float, top: Float, width: Float, progress: Float) {
+        val left = centerX - width / 2f
+        paint.style = Paint.Style.FILL
+        paint.color = Color.rgb(199, 199, 188)
+        canvas.drawRect(left, top, left + width, top + 1.25f, paint)
+        paint.color = Color.rgb(117, 117, 110)
+        canvas.drawRect(left, top, left + width * progress.coerceIn(0f, 1f), top + 1.25f, paint)
     }
 
     private fun drawCaption(canvas: Canvas, state: WordMatchState, anchor: Vec2, alpha: Float,

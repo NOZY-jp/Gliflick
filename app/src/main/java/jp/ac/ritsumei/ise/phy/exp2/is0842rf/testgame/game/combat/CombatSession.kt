@@ -41,6 +41,7 @@ class CombatSession(
     val completions: List<CompletedCaption> get() = mutableCompletions
     val streak get() = engine.streak
     val isWordRushActive get() = typingBonuses.isWordRushActiveAt(world.elapsedSeconds)
+    val typingBonusStatus get() = typingBonuses.status(engine.streak, world.elapsedSeconds)
     val mistypeCount get() = engine.mistypeCount
     var overlapEvents: List<OverlapEvent> = emptyList()
         private set
