@@ -49,7 +49,7 @@ The curated list contains 1,625 entries; every reading-length group has at least
 
 `EnemySpawnPolicy` chooses which definition appears; `EnemySpawnDensity` decides whether one enemy appears in the current simulation step. The arena starts empty and random arrivals are possible immediately. Each step can create at most one enemy. There are no groups, pulse intervals, or delayed first wave.
 
-`RandomEnemySpawnDensity` samples an independent Poisson arrival chance each update: `1 - exp(-rate × dt)`. The rate starts at 0.9 enemies/second and moves smoothly between 0.8× and 1.2× over a 120-second density cycle. The player-level multiplier is `min(1 + 0.04 × (level - 1), 1.4)`. The living-enemy cap is 16; arrivals pause only while that cap is full, then resume on the next random decision. There is no separate interval timer or multi-enemy request.
+`RandomEnemySpawnDensity` samples an independent Poisson arrival chance each update: `1 - exp(-rate × dt)`. The rate starts at 0.9 enemies/second and moves smoothly between 0.8× and 1.2× over a 120-second density cycle. The player-level multiplier is `min(1 + 0.04 × (level - 1), 1.4)`. Every successful random decision creates one enemy; there is no living-enemy cap, interval timer, or multi-enemy request. Tests can explicitly disable arrivals through `CombatConfig.spawningEnabled`.
 
 The spawn rate and level multiplier are explicit, editable prototype tuning, not a recovered Glyphica formula. The current `Threat` value is a placeholder at zero and has no effect on spawn density.
 

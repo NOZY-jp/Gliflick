@@ -11,7 +11,7 @@ import kotlin.random.Random
 class CombatTest {
     private fun tokens(text: String) = text.map { InputToken.Stroke(it.toString()) }
     private fun world(weapon: MainWeapon = Repeater()) = CombatWorld(
-        CombatConfig(maxEnemies = 0), Random(8),
+        CombatConfig(spawningEnabled = false), Random(8),
         FixedEnemySpawnPolicy(EnemyDefinition(speed = 0f)), weapon).also { it.resize(400f, 400f) }
     private fun run(world: CombatWorld, seconds: Float) = repeat((seconds * 120).toInt()) { world.update(1f / 120f) }
     private fun session(): CombatSession = CombatSession(listOf(WordDefinition("kaki", "かき", "柿")), world(), Random(1))

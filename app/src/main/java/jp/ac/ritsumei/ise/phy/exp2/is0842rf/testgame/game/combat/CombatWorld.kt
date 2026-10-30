@@ -7,9 +7,9 @@ data class ProgressionDefinition(val killExperience: Int = 10, val firstLevelExp
                                  val experienceIncreasePerLevel: Int = 20) {
     init { require(killExperience >= 0 && firstLevelExperience > 0 && experienceIncreasePerLevel >= 0) }
 }
-data class CombatConfig(val maxEnemies: Int = 16, val playerMaxHp: Int = 300,
+data class CombatConfig(val spawningEnabled: Boolean = true, val playerMaxHp: Int = 300,
                         val progression: ProgressionDefinition = ProgressionDefinition()) {
-    init { require(maxEnemies >= 0 && playerMaxHp > 0) }
+    init { require(playerMaxHp > 0) }
 }
 
 fun interface EnemySpawnPolicy {
@@ -155,9 +155,7 @@ class CombatWorld(
                 projectile.position.y !in -32f..height + 32f) spent += projectile
         }
         mutableProjectiles.removeAll(spent)
-        val livingCount = mutableEnemies.count { it.isAlive }
-        val availableSlots = (config.maxEnemies - livingCount).coerceAtLeast(0)
-        if (availableSlots > 0 && spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
+        if (config.spawningEnabled && spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level, random)
             spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
         }
