@@ -34,11 +34,22 @@ class SecondaryWeaponRenderer(context: Context) {
                     val points = body.trail + p
                     for (i in 1 until points.size) {
                         val a = points[i - 1]; val b = points[i]
-                        icons.drawSpectreSegment(canvas, a.x, a.y, b.x, b.y, 1.5f,
+                        icons.drawSpectreSegment(canvas, a.x, a.y, b.x, b.y,
+                            if ((body as DroneActor).enhanced) 3f else 1.5f,
                             ink(210 * i / points.size))
                     }
+                    if ((body as DroneActor).enhanced) {
+                        paint.style = Paint.Style.FILL; paint.color = ink(190)
+                        canvas.drawCircle(p.x, p.y, 2f, paint)
+                        circle(canvas, p, 10f, 95, 1f)
+                    }
                 }
-                WeaponId.HUNTER -> actor(canvas, body.source, p, 5f, body.angle)
+                WeaponId.HUNTER -> {
+                    if ((body as DroneActor).enhanced) {
+                        canvas.save(); canvas.rotate(body.angle * 180f / PI.toFloat(), p.x, p.y)
+                        icons.drawHunterElite(canvas, p.x, p.y, 13f, ink(190)); canvas.restore()
+                    } else actor(canvas, body.source, p, 5f, body.angle)
+                }
                 WeaponId.SENTRY -> {
                     val muzzle = p + Vec2(cos(body.angle), sin(body.angle)) * (world.player.radius + 2f)
                     actor(canvas, body.source, muzzle, 2.5f, body.angle)
@@ -53,7 +64,10 @@ class SecondaryWeaponRenderer(context: Context) {
                     val degrees = body.angle * 180f / PI.toFloat()
                     canvas.drawArc(bounds, degrees + 90f, 40f, true, paint)
                     canvas.drawArc(bounds, degrees + 270f, 40f, true, paint)
-                    actor(canvas, body.source, p, body.range, body.angle)
+                    if ((body as MovingBladeActor).saw) {
+                        canvas.save(); canvas.rotate(body.angle * 180f / PI.toFloat(), p.x, p.y)
+                        icons.drawSaw(canvas, p.x, p.y, body.range, ink(190)); canvas.restore()
+                    } else actor(canvas, body.source, p, body.range, body.angle)
                 }
                 WeaponId.BLADE_TRAP -> actor(canvas, body.source, p, body.range, body.angle)
                 WeaponId.MINEFIELD -> {
@@ -71,12 +85,28 @@ class SecondaryWeaponRenderer(context: Context) {
                         canvas.drawLine(a.x, a.y, b.x, b.y, paint)
                         distance += 8f
                     }
+                    if (body.state.has(SecondaryEvolution.TETHER)) {
+                        stroke(90, 0.8f)
+                        canvas.drawLine(world.player.position.x, world.player.position.y, p.x, p.y, paint)
+                    }
                     val trail = body.trail
                     trail.forEachIndexed { i, point ->
                         val fraction = (i + 1f) / (trail.size + 1f)
                         actor(canvas, body.source, point, body.range * fraction, alpha = (42 * fraction).toInt())
                     }
                     actor(canvas, body.source, p, body.range, alpha = 80)
+                    if (body.state.has(SecondaryEvolution.STORM_RING)) {
+                        for (i in 1 until trail.size) drawLightning(canvas,
+                            WeaponEffect(trail[i - 1], trail[i], DamageType.ELECTRIC))
+                        val path = Path()
+                        for (i in 0..32) {
+                            val angle = i * PI.toFloat() / 16f
+                            val radius = body.range * (1.06f + 0.12f * sin(i * 2.7f + body.age * 20f))
+                            val point = p + Vec2(cos(angle), sin(angle)) * radius
+                            if (i == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
+                        }
+                        stroke(140, 0.65f); canvas.drawPath(path, paint)
+                    }
                 }
                 WeaponId.GUARDIAN -> drawGuardian(canvas, body as GuardianActor, world)
                 WeaponId.METEOR -> actor(canvas, body.source, p, 8f * body.sizeScale, body.age * 0.6f, 125)
@@ -107,14 +137,14 @@ class SecondaryWeaponRenderer(context: Context) {
             val p = pickup.position
             if (pickup.kind == PickupKind.METEOR) actor(canvas, WeaponId.METEOR, p,
                 8f * WeaponSizeTuning.forWeapon(WeaponId.METEOR), pickup.age * 0.6f)
-            else icons.drawFuel(canvas, p.x, p.y, 7f, ink(190))
+            else icons.drawFuel(canvas, p.x, p.y, 7f, ink(190), pickup.fuelBonus)
             paint.style = Paint.Style.FILL; paint.color = Color.rgb(199, 199, 188)
             canvas.drawRect(p.x - 10f, p.y + 13f, p.x + 10f, p.y + 14.5f, paint)
             paint.color = ink
             canvas.drawRect(p.x - 10f, p.y + 13f, p.x - 10f + 20f * pickup.remainingFraction, p.y + 14.5f, paint)
             paint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             paint.textSize = 8f; paint.textAlign = Paint.Align.CENTER
-            canvas.drawText(pickup.kind.title, p.x, p.y + 25f, paint)
+            canvas.drawText(pickup.kind.title + (pickup.fuelBonus?.let { "・${it.title}" } ?: ""), p.x, p.y + 25f, paint)
         }
         paint.alpha = 255; paint.style = Paint.Style.FILL
     }
@@ -167,7 +197,8 @@ class SecondaryWeaponRenderer(context: Context) {
     /** Secondary projectiles retain their own appearance instead of sharing Repeater's long trail. */
     fun drawProjectile(canvas: Canvas, bullet: Projectile): Boolean = when (bullet.source) {
         WeaponId.OSCILLATOR -> {
-            actor(canvas, WeaponId.OSCILLATOR, bullet.position, 1.5f, alpha = 155)
+            actor(canvas, WeaponId.OSCILLATOR, bullet.position, if (bullet.damageType == DamageType.ELECTRIC) 2.3f else 1.5f, alpha = 155)
+            if (bullet.damageType == DamageType.ELECTRIC) circle(canvas, bullet.position, 3.3f, 90, 0.5f)
             true
         }
         WeaponId.SENTRY -> {
@@ -189,7 +220,19 @@ class SecondaryWeaponRenderer(context: Context) {
             paint.style = Paint.Style.STROKE; paint.strokeWidth = 0.65f
             paint.color = Color.rgb(199, 199, 188)
             canvas.drawRoundRect(x, height - 29f, x + 23f, height - 6f, 2f, 2f, paint)
-            weapons.getOrNull(slot)?.let { icons.draw(canvas, it, x + 11.5f, height - 17.5f, 8f, ink) }
+            weapons.getOrNull(slot)?.let { id ->
+                icons.draw(canvas, id, x + 11.5f, height - 17.5f, 8f, ink)
+                world.weaponState(id)?.let { state ->
+                    paint.style = Paint.Style.FILL; paint.color = ink(45)
+                    canvas.drawRect(x, height - 4f, x + 23f, height - 2.5f, paint)
+                    paint.color = ink(if (state.canEvolve) 230 else 150)
+                    canvas.drawRect(x, height - 4f, x + 23f * state.evolutionProgress, height - 2.5f, paint)
+                    if (state.evolutionsChosen > 0) {
+                        paint.textSize = 6f; paint.textAlign = Paint.Align.RIGHT
+                        canvas.drawText("${state.evolutionsChosen}", x + 22f, height - 23f, paint)
+                    }
+                }
+            }
         }
         paint.style = Paint.Style.FILL
     }

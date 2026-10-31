@@ -149,7 +149,9 @@ class Projectile(
     val damageType: DamageType = DamageType.KINETIC,
     val explosionRadius: Float = 0f,
     var ricochets: Int = 0,
-    val freezeChance: Float = 0f
+    val freezeChance: Float = 0f,
+    val penetrates: Boolean = false,
+    val ricochetDamageMultiplier: Float = 0.5f
 ) {
     init {
         require(damage >= 0 && radius > 0f)

@@ -3,6 +3,7 @@ package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.TypingLanguages
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordDefinition
 import kotlin.math.*
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.SecondaryEvolution.*
 
 data class CompletedCombatWord(val word: WordDefinition, val targetId: Long, val position: Vec2) {
     /** Dictionary spelling is a gameplay condition, never reconstructed input or matcher input. */
@@ -23,7 +24,8 @@ object WeaponSizeTuning {
     }
 }
 enum class PickupKind(val title: String) { METEOR("爆撃照準"), FUEL("燃料") }
-class CombatPickup(val id: Long, val kind: PickupKind, var position: Vec2, val lifetime: Float = 14f) {
+class CombatPickup(val id: Long, val kind: PickupKind, var position: Vec2, val lifetime: Float = 14f,
+                   val fuelBonus: WeaponStat? = null) {
     var age = 0f
     val remainingFraction get() = (1f - age / lifetime).coerceIn(0f, 1f)
 }
@@ -39,6 +41,7 @@ interface SecondaryWeapon {
     val id: WeaponId
     val state: WeaponRunState
     fun equip(world: CombatWorld) = Unit
+    fun onEvolved(world: CombatWorld) = Unit
     fun onWord(world: CombatWorld, event: CompletedCombatWord) = Unit
     fun onMainWeaponFire(world: CombatWorld, projectile: Projectile) = Unit
     fun update(world: CombatWorld, dt: Float) = Unit
@@ -54,7 +57,7 @@ abstract class BaseSecondary(override val id: WeaponId) : SecondaryWeapon {
 
 abstract class WeaponActor(
     val state: WeaponRunState, var position: Vec2, val visual: WeaponVisualKind,
-    val type: DamageType, var remaining: Float, val initialDuration: Float,
+    private val originalType: DamageType, var remaining: Float, val initialDuration: Float,
     val baseDamage: Float, val baseRange: Float
 ) {
     var angle = 0f
@@ -67,8 +70,12 @@ abstract class WeaponActor(
     val trail: List<Vec2> get() = mutableTrail.toList()
     val source get() = state.id
     val sizeScale get() = WeaponSizeTuning.forWeapon(source)
-    val range get() = baseRange * sizeScale * state.scale(WeaponStat.RANGE)
-    val damage get() = (baseDamage * state.scale(WeaponStat.DAMAGE)).roundToInt().coerceAtLeast(1)
+    val type get() = EvolutionEffects.type(state, originalType)
+    val range get() = baseRange * sizeScale * state.scale(WeaponStat.RANGE) * formScale
+    open val formScale get() = 1f
+    val damage get() = ((baseDamage + EvolutionEffects.extraDamage(state)) *
+        state.scale(WeaponStat.DAMAGE) * damageMultiplier).roundToInt().coerceAtLeast(1)
+    protected open val damageMultiplier get() = 1f
     val durationFraction get() = (remaining / initialDuration).coerceIn(0f, 1f)
     protected val hitTimes = mutableMapOf<Long, Double>()
     abstract fun update(world: CombatWorld, dt: Float)
@@ -91,6 +98,9 @@ abstract class WeaponActor(
             world.dealDamage(enemy.id, damage, source, type,
                 if (allowCrit) 0.01f + state.bonus(WeaponStat.CRIT) + world.currentWeaponModifiers.criticalChanceBonus else 0f,
                 2f + state.bonus(WeaponStat.CRIT_MULTIPLIER))
+            val poison = state.rank(POISON_COATING)
+            if (poison > 0 && enemy.isAlive) world.dealDamage(enemy.id,
+                (5f * poison * state.scale(WeaponStat.DAMAGE)).roundToInt(), source, DamageType.CHEMICAL, inflictStatus = false)
             hitTimes[enemy.id] = world.elapsedSeconds + interval /
                 (state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
         }
@@ -101,25 +111,35 @@ abstract class WeaponActor(
     }
 }
 
-class DroneActor(state: WeaponRunState, position: Vec2, private val ranged: Boolean) : WeaponActor(
+class DroneActor(state: WeaponRunState, position: Vec2, private val ranged: Boolean, val enhanced: Boolean = false) : WeaponActor(
     state, position, WeaponVisualKind.DRONE,
     if (ranged) DamageType.ELECTRIC else DamageType.KINETIC,
     7f * state.scale(WeaponStat.DURATION), 7f * state.scale(WeaponStat.DURATION),
     if (ranged) 10f else 50f, if (ranged) 70f else 5f
 ) {
+    override val formScale get() = if (enhanced) 1.5f else 1f
+    override val damageMultiplier get() = if (enhanced) 2f else 1f
+    init { if (enhanced) remaining *= 1.5f }
     private var fireCooldown = 0f
     private var targetId: Long? = null
     private var headingInitialized = false
     override fun update(world: CombatWorld, dt: Float) {
         beamEnd = null
         advanceLifetime(dt)
-        if (finished) return
+        if (finished) {
+            if (state.has(SELF_DESTRUCT)) {
+                val radius = 22f * (if (state.rank(SELF_DESTRUCT) == 2) 1.3f else 1f) * state.scale(WeaponStat.RANGE)
+                world.areaDamage(position, radius, (50f * state.rank(SELF_DESTRUCT) * state.scale(WeaponStat.DAMAGE)).roundToInt(), source, DamageType.EXPLOSIVE)
+                world.addEffect(WeaponEffect(position, position, DamageType.EXPLOSIVE, radius, 0.35f, source))
+            }
+            return
+        }
         val target = world.enemies.firstOrNull { it.id == targetId && it.isAlive }
             ?: world.nearestEnemy(position) ?: return
         targetId = target.id
         val delta = target.position - position
         val desired = atan2(delta.y, delta.x)
-        val speed = 75f * state.scale(WeaponStat.SPEED)
+        val speed = 75f * state.scale(WeaponStat.SPEED) * formScale
         val previous = position
         if (ranged) {
             angle = desired
@@ -136,19 +156,36 @@ class DroneActor(state: WeaponRunState, position: Vec2, private val ranged: Bool
             fireCooldown -= dt
             if ((target.position - position).length() <= range && fireCooldown <= 0f) {
                 val muzzle = position + Vec2(cos(angle), sin(angle)) * 5f
-                world.addEffect(WeaponEffect(muzzle, target.position, type, source = source))
-                world.dealDamage(target.id, damage, source, type)
-                beamEnd = target.position
+                if (state.has(ELECTRIFIED_BOLTS)) {
+                    world.launch(Projectile(muzzle, delta.normalized() * 320f, damage, 1.6f,
+                        source = source, damageType = type, ricochets = state.rank(CHAIN_LIGHTNING),
+                        ricochetDamageMultiplier = 1f))
+                } else {
+                    val visited = mutableSetOf<Long>()
+                    var victim: Enemy? = target
+                    var start = muzzle
+                    repeat(1 + state.rank(CHAIN_LIGHTNING)) {
+                        victim?.let { enemy ->
+                            visited += enemy.id
+                            world.addEffect(WeaponEffect(start, enemy.position, type, source = source))
+                            world.dealDamage(enemy.id, damage, source, type)
+                            start = enemy.position
+                            victim = world.enemies.filter { it.isAlive && it.id !in visited &&
+                                (it.position - start).length() <= range }.minByOrNull { (it.position - start).length() }
+                        }
+                    }
+                    beamEnd = target.position
+                }
                 fireCooldown += 0.3f /
                     (state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
             }
         } else if (sweptCircleHit(previous - target.previousPosition,
-                position - target.position, target.radius + 5f) != null) hit(world, target, 0.55f)
+                position - target.position, target.radius + 5f * formScale) != null) hit(world, target, 0.55f)
     }
 }
 
 /** Guardian has its own pursuit and orbiting fireballs, independent of the two glyph-spawned drones. */
-class GuardianActor(state: WeaponRunState, position: Vec2) : WeaponActor(
+class GuardianActor(state: WeaponRunState, position: Vec2, val index: Int = 0) : WeaponActor(
     state, position, WeaponVisualKind.GUARDIAN, DamageType.HEAT,
     30f * state.scale(WeaponStat.DURATION), 30f * state.scale(WeaponStat.DURATION), 20f, 70f
 ) {
@@ -167,7 +204,7 @@ class GuardianActor(state: WeaponRunState, position: Vec2) : WeaponActor(
         val target = world.enemies.filter { it.isAlive &&
             (it.position - world.player.position).length() <= range + it.radius }
             .minByOrNull { (it.position - position).length() }
-        val destination = target?.position ?: (world.player.position + Vec2(20f, -20f))
+        val destination = target?.position ?: (world.player.position + Vec2(20f * cos(index * 2.1f), -20f + 20f * sin(index * 2.1f)))
         val delta = destination - position
         if (delta.length() > 0.01f) {
             angle = atan2(delta.y, delta.x)
@@ -184,13 +221,14 @@ class GuardianActor(state: WeaponRunState, position: Vec2) : WeaponActor(
         .coerceAtMost(60f * state.scale(WeaponStat.DURATION)) }
 }
 
-class SentryActor(state: WeaponRunState, position: Vec2) : WeaponActor(
+class SentryActor(state: WeaponRunState, position: Vec2, val index: Int = 0) : WeaponActor(
     state, position, WeaponVisualKind.SENTRY, DamageType.HEAT, Float.MAX_VALUE,
     Float.MAX_VALUE, 30f, 80f
 ) {
     private var cooldown = 0f
     override fun update(world: CombatWorld, dt: Float) {
-        position = world.player.position
+        val offset = if (index == 0) Vec2(0f, 0f) else Vec2(cos(index * 2.4f), sin(index * 2.4f)) * 14f
+        position = world.player.position + offset
         cooldown -= dt
         val target = world.nearestEnemy(position, range) ?: return
         val delta = target.position - position
@@ -199,8 +237,8 @@ class SentryActor(state: WeaponRunState, position: Vec2) : WeaponActor(
         angle += difference.coerceIn(-6f * dt, 6f * dt)
         if (abs(difference) < 0.24f && cooldown <= 0f) {
             world.launch(Projectile(position, Vec2(cos(angle), sin(angle)) * 410f, damage, radius = 2.1f,
-                source = source, damageType = type, criticalChance = 0.01f + world.currentWeaponModifiers.criticalChanceBonus,
-                criticalDamageMultiplier = 2f))
+                source = source, damageType = type, criticalChance = (0.01f + state.bonus(WeaponStat.CRIT) + world.currentWeaponModifiers.criticalChanceBonus).coerceIn(0f, 1f),
+                criticalDamageMultiplier = 2f + state.bonus(WeaponStat.CRIT_MULTIPLIER)))
             cooldown += (60f / 86f) / (state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
         }
     }
@@ -212,8 +250,14 @@ class FieldActor(state: WeaponRunState, position: Vec2, kind: WeaponVisualKind,
     duration * state.scale(WeaponStat.DURATION), damage, radius
 ) {
     private var cooldown = 0f
+    var destination: Vec2? = null
+    var continuous = false
     override fun update(world: CombatWorld, dt: Float) {
-        advanceLifetime(dt)
+        if (!continuous) advanceLifetime(dt)
+        destination?.let { target ->
+            val delta = target - position
+            position += delta.normalized() * min(delta.length(), 35f * state.scale(WeaponStat.SPEED) * dt)
+        }
         if (visual == WeaponVisualKind.BLADE)
             angle += dt * 4f * state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier
         if (visual == WeaponVisualKind.BLADE) {
@@ -240,20 +284,27 @@ class FieldActor(state: WeaponRunState, position: Vec2, kind: WeaponVisualKind,
     }
 }
 
-class MovingBladeActor(state: WeaponRunState, position: Vec2, private val velocity: Vec2) : WeaponActor(
+class MovingBladeActor(state: WeaponRunState, position: Vec2, private var velocity: Vec2,
+                       val saw: Boolean = false) : WeaponActor(
     state, position, WeaponVisualKind.BLADE, DamageType.KINETIC, 12f, 12f, 24f, 24f
 ) {
+    private var returning = false
+    override val formScale get() = if (saw) 0.35f else 1f
     override fun update(world: CombatWorld, dt: Float) {
         advanceLifetime(dt)
         val previous = position
-        position += velocity * dt
+        if (returning) velocity = (world.player.position - position).normalized() * velocity.length()
+        position += velocity * (state.scale(WeaponStat.SPEED) * dt)
         angle += dt * 12f * state.scale(WeaponStat.RATE)
         world.enemies.filter { it.isAlive }.forEach { enemy ->
             if (sweptCircleHit(previous - enemy.previousPosition, position - enemy.position, range + enemy.radius) != null)
                 hit(world, enemy, 0.22f)
         }
         val margin = max(32f, range)
-        if (position.x !in -margin..world.width + margin || position.y !in -margin..world.height + margin) finished = true
+        if (returning && (position - world.player.position).length() < 8f) finished = true
+        if (position.x !in -margin..world.width + margin || position.y !in -margin..world.height + margin) {
+            if (state.has(BOOMERANG) && !returning) returning = true else if (!returning) finished = true
+        }
     }
 }
 
@@ -263,7 +314,9 @@ class MineActor(state: WeaponRunState, position: Vec2, private val direction: Ve
     override fun update(world: CombatWorld, dt: Float) {
         advanceLifetime(dt)
         val previous = position
-        position += direction * (18f * state.scale(WeaponStat.SPEED) * dt)
+        val movement = if (state.has(HUNTER_SEEKER)) world.nearestEnemy(position)?.let {
+            (it.position - position).normalized() } ?: direction else direction
+        position += movement * (18f * state.scale(WeaponStat.SPEED) * dt)
         angle += dt * 4.7f
         val hit = world.enemies.any { it.isAlive &&
             sweptCircleHit(previous - it.previousPosition, position - it.position, 4f * sizeScale + it.radius) != null }
@@ -275,7 +328,7 @@ class MineActor(state: WeaponRunState, position: Vec2, private val direction: Ve
     }
 }
 
-class OrbitActor(state: WeaponRunState, position: Vec2, initialAngle: Float) : WeaponActor(
+class OrbitActor(state: WeaponRunState, position: Vec2, initialAngle: Float, private val clockwise: Boolean = true) : WeaponActor(
     state, position, WeaponVisualKind.ORB, DamageType.CHEMICAL,
     10f * state.scale(WeaponStat.DURATION), 10f * state.scale(WeaponStat.DURATION), 70f, 10f
 ) {
@@ -285,11 +338,18 @@ class OrbitActor(state: WeaponRunState, position: Vec2, initialAngle: Float) : W
         advanceLifetime(dt)
         val previous = position
         if (orbitRadius == null) orbitRadius = (position - world.player.position).length()
-        angle += dt * 1.8f * state.scale(WeaponStat.SPEED)
+        angle += dt * 1.8f * state.scale(WeaponStat.SPEED) * if (clockwise) 1f else -1f
         position = world.player.position + Vec2(cos(angle), sin(angle)) * orbitRadius!!
         world.enemies.filter { it.isAlive }.forEach {
             if (sweptCircleHit(previous - it.previousPosition, position - it.position, range + it.radius) != null)
                 hit(world, it, 0.5f)
+            else if (state.has(TETHER) && sweptCircleHit(world.player.position - it.position,
+                    position - it.position, it.radius + 0.8f) != null &&
+                    world.elapsedSeconds >= (hitTimes[it.id] ?: -1.0)) {
+                val fraction = if (state.rank(TETHER) == 2) 0.5f else 0.3f
+                world.dealDamage(it.id, (damage * fraction).roundToInt(), source, type)
+                hitTimes[it.id] = world.elapsedSeconds + 0.5f / state.scale(WeaponStat.RATE)
+            }
         }
     }
     override fun resize(sx: Float, sy: Float) {
@@ -300,26 +360,37 @@ class OrbitActor(state: WeaponRunState, position: Vec2, initialAngle: Float) : W
 }
 
 class SpectreWeapon : BaseSecondary(WeaponId.SPECTRE) {
+    private var produced = 0
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
         repeat(event.containsCount("aeo").coerceAtMost(8)) {
-            world.addActor(DroneActor(state, world.player.position + world.randomDirection() * 5f, false))
+            if (state.has(SUPERCHARGED)) produced++
+            world.addActor(DroneActor(state, world.player.position + world.randomDirection() * 5f,
+                false, state.has(SUPERCHARGED) && produced % 20 == 0))
         }
     }
 }
 class HunterWeapon : BaseSecondary(WeaponId.HUNTER) {
+    private var produced = 0
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
         repeat(event.containsCount("iou").coerceAtMost(8)) {
-            world.addActor(DroneActor(state, world.player.position + world.randomDirection() * 8f, true))
+            if (state.has(HUNTER_ELITE)) produced++
+            world.addActor(DroneActor(state, world.player.position + world.randomDirection() * 8f,
+                true, state.has(HUNTER_ELITE) && produced % 12 == 0))
         }
     }
 }
 class SentryWeapon : BaseSecondary(WeaponId.SENTRY) {
-    override fun equip(world: CombatWorld) { world.addActor(SentryActor(state, world.player.position)) }
+    override fun equip(world: CombatWorld) { syncTurrets(world) }
+    override fun onEvolved(world: CombatWorld) { syncTurrets(world) }
+    private fun syncTurrets(world: CombatWorld) {
+        val count = world.weaponActors.count { it.source == id }
+        for (i in count until 1 + state.rank(DEFENSE_GRID)) world.addActor(SentryActor(state, world.player.position, i))
+    }
 }
 class TeslaMineWeapon : BaseSecondary(WeaponId.TESLA_MINE) {
     private var deploymentCooldown = 0f
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (deploymentCooldown <= 0f && event.startsWith("bcde")) {
+        if (deploymentCooldown <= 0f && event.startsWith(EvolutionEffects.triggerLetters(state, "bcde"))) {
             world.addActor(FieldActor(state, deployment(world, event),
                 WeaponVisualKind.TESLA, 32f, 12f, 38f, DamageType.ELECTRIC).also { it.angle = world.randomAngle() })
             deploymentCooldown = DEPLOYMENT_COOLDOWN_SECONDS
@@ -340,70 +411,128 @@ class OscillatorWeapon : BaseSecondary(WeaponId.OSCILLATOR) {
         cooldown -= dt
         if (cooldown <= 0f) {
             val angle = atan2(direction.y, direction.x) + sin(world.elapsedSeconds.toFloat() * 3f) * 0.3f * scale(WeaponStat.SPREAD)
-            world.launch(Projectile(world.player.position, Vec2(cos(angle), sin(angle)) * 230f,
-                (10f * scale(WeaponStat.DAMAGE)).roundToInt(), 2.2f,
-                criticalChance = 0.01f + world.currentWeaponModifiers.criticalChanceBonus,
-                criticalDamageMultiplier = 2f, source = id, damageType = DamageType.HEAT))
+            repeat(if (state.has(TWIN_HEADED)) 2 else 1) { index ->
+                val heading = angle + index * PI.toFloat()
+                world.launch(Projectile(world.player.position, Vec2(cos(heading), sin(heading)) * 230f,
+                    ((10f + EvolutionEffects.extraDamage(state)) * scale(WeaponStat.DAMAGE)).roundToInt(), 2.2f,
+                    criticalChance = (0.01f + state.bonus(WeaponStat.CRIT) + world.currentWeaponModifiers.criticalChanceBonus).coerceIn(0f, 1f),
+                    criticalDamageMultiplier = 2f + state.bonus(WeaponStat.CRIT_MULTIPLIER), source = id,
+                    damageType = EvolutionEffects.type(state, DamageType.HEAT), penetrates = state.has(STABILIZED_PLASMA)))
+            }
             cooldown += 0.16f / (scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
         }
     }
 }
 class MeteorWeapon : BaseSecondary(WeaponId.METEOR) {
     private var cooldown = 2f
+    private var continuous: FieldActor? = null
+    override fun onWord(world: CombatWorld, event: CompletedCombatWord) { continuous?.destination = event.position }
+    override fun onEvolved(world: CombatWorld) {
+        if (state.has(RELENTLESS) && continuous == null) {
+            world.removePickups(PickupKind.METEOR)
+            continuous = FieldActor(state, world.randomPoint(42f), WeaponVisualKind.BOMBARDMENT,
+                2.2f, 80f, 40f, DamageType.EXPLOSIVE).also { it.continuous = true; world.addActor(it) }
+        }
+    }
     override fun update(world: CombatWorld, dt: Float) {
+        if (state.has(RELENTLESS)) { onEvolved(world); return }
         cooldown -= dt
         if (cooldown <= 0f && !world.hasPickup(PickupKind.METEOR)) {
-            world.spawnPickup(PickupKind.METEOR, world.randomPoint(42f))
+            repeat(1 + state.rank(SURVEILLANCE)) { world.spawnPickup(PickupKind.METEOR, world.randomPoint(42f)) }
             cooldown = 9f / scale(WeaponStat.RATE)
         }
     }
     override fun activatePickup(world: CombatWorld, pickup: CombatPickup) {
-        if (pickup.kind == PickupKind.METEOR) world.addActor(FieldActor(state, pickup.position,
-            WeaponVisualKind.BOMBARDMENT, 2.2f, 80f, 40f, DamageType.EXPLOSIVE))
+        if (pickup.kind == PickupKind.METEOR) {
+            world.addActor(FieldActor(state, pickup.position, WeaponVisualKind.BOMBARDMENT,
+                2.2f, 80f, 40f, DamageType.EXPLOSIVE))
+            world.removePickups(PickupKind.METEOR) // Surveillance supplies alternatives, not extra simultaneous rewards.
+        }
     }
 }
 class ChopperWeapon : BaseSecondary(WeaponId.CHOPPER) {
     override fun onMainWeaponFire(world: CombatWorld, projectile: Projectile) {
-        world.addActor(MovingBladeActor(state, world.player.position,
-            projectile.velocity.normalized() * 150f))
+        val direction = projectile.velocity.normalized()
+        val heading = atan2(direction.y, direction.x)
+        val saw = state.has(SAW_LAUNCHER)
+        val count = if (saw) 2 * state.rank(SAW_LAUNCHER) else 1
+        repeat(1 + state.rank(DUAL_WIELD)) { group ->
+            repeat(count) { index ->
+                val angle = heading + group * 0.12f + if (saw) (index - (count - 1) / 2f) * 0.18f else 0f
+                world.addActor(MovingBladeActor(state, world.player.position,
+                    Vec2(cos(angle), sin(angle)) * (if (saw) 230f else 150f), saw))
+            }
+        }
     }
 }
 class MinefieldWeapon : BaseSecondary(WeaponId.MINEFIELD) {
+    private var recursiveCooldown = 12f
+    private val count get() = 3 + state.bonus(WeaponStat.MINE_COUNT).toInt() + if (state.rank(HUNTER_SEEKER) == 2) 1 else 0
+    private fun spawn(world: CombatWorld, count: Int) { repeat(count) {
+        world.addActor(MineActor(state, world.player.position, world.randomDirection()))
+    } }
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith("fghi")) repeat(1 + state.bonus(WeaponStat.MINE_COUNT).toInt()) {
-            world.addActor(MineActor(state, world.player.position, world.randomDirection()))
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, "fghi"))) spawn(world, count)
+    }
+    override fun update(world: CombatWorld, dt: Float) {
+        if (!state.has(RECURSIVE_MINES)) return
+        recursiveCooldown -= dt * scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier
+        if (recursiveCooldown <= 0f) {
+            recursiveCooldown += 12f
+            spawn(world, count / 2 + if (state.rank(RECURSIVE_MINES) == 2) 1 else 0)
         }
     }
 }
 class BladeTrapWeapon : BaseSecondary(WeaponId.BLADE_TRAP) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith("jklm")) world.addActor(FieldActor(state, deployment(world, event),
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, "jklm"))) world.addActor(FieldActor(state, deployment(world, event),
             WeaponVisualKind.BLADE, 10f, 5f, 28f, DamageType.KINETIC))
     }
 }
 class OrbiterWeapon : BaseSecondary(WeaponId.ORBITER) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith("nopq")) {
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, "nopq"))) {
             val delta = event.position - world.player.position
             world.addActor(OrbitActor(state, event.position, atan2(delta.y, delta.x)))
+            if (state.has(DOPPELGANGER)) world.addActor(OrbitActor(state, event.position, atan2(delta.y, delta.x), false))
         }
     }
 }
 class GuardianWeapon : BaseSecondary(WeaponId.GUARDIAN) {
-    private var drone: GuardianActor? = null
+    private val drones = mutableListOf<GuardianActor>()
     private var fuelCooldown = 8f
+    private var boostRemaining = 0f
+    var fuelBoost: WeaponStat? = null; private set
     override fun equip(world: CombatWorld) {
-        drone = GuardianActor(state, world.player.position + Vec2(20f, -20f)).also(world::addActor)
+        state.temporaryBonus = { if (it == fuelBoost && boostRemaining > 0f)
+            (if (it == WeaponStat.SPEED) 1f else 0.5f) *
+                (if (state.rank(EXPERIMENTAL_FUEL) == 2) 1.5f else 1f) else 0f }
+        onEvolved(world)
+    }
+    override fun onEvolved(world: CombatWorld) {
+        while (drones.size < 1 + state.rank(GUARDIAN_TEAM)) {
+            val i = drones.size
+            drones += GuardianActor(state, world.player.position + Vec2(20f * cos(i * 2.1f), -20f + 20f * sin(i * 2.1f)), i).also(world::addActor)
+        }
     }
     override fun update(world: CombatWorld, dt: Float) {
+        boostRemaining = (boostRemaining - dt).coerceAtLeast(0f)
         fuelCooldown -= dt
         if (fuelCooldown <= 0f && !world.hasPickup(PickupKind.FUEL)) {
-            world.spawnPickup(PickupKind.FUEL, world.randomPoint(36f))
+            world.spawnPickup(PickupKind.FUEL, world.randomPoint(36f),
+                if (state.has(EXPERIMENTAL_FUEL)) listOf(WeaponStat.DAMAGE, WeaponStat.SPEED, WeaponStat.RANGE)[world.randomIndex(3)] else null)
             fuelCooldown = 12f
         }
     }
     override fun activatePickup(world: CombatWorld, pickup: CombatPickup) {
-        if (pickup.kind == PickupKind.FUEL) drone?.refuel()
+        if (pickup.kind == PickupKind.FUEL) {
+            drones.forEach { it.refuel() }
+            if (state.has(EXPERIMENTAL_FUEL)) {
+                fuelBoost = pickup.fuelBonus
+                    ?: listOf(WeaponStat.DAMAGE, WeaponStat.SPEED, WeaponStat.RANGE)[world.randomIndex(3)]
+                boostRemaining = if (state.rank(EXPERIMENTAL_FUEL) == 2) 12f else 8f
+            }
+        }
     }
 }
 

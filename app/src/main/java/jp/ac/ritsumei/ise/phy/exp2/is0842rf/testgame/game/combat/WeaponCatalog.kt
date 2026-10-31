@@ -27,41 +27,53 @@ enum class WeaponStat(val title: String) {
 
 class WeaponRunState(val id: WeaponId) {
     private val bonuses = mutableMapOf<WeaponStat, Float>()
-    val evolutions = mutableMapOf<RepeaterEvolution, Int>()
+    val evolutions = mutableMapOf<WeaponEvolution, Int>()
+    var extraTriggerLetters = ""; internal set
     var level = 1; private set
     var evolutionCredit = 0; private set
     var evolutionsChosen = 0; private set
-    val nextEvolutionCredit get() = (evolutionsChosen + 1) * 50
-    val pendingEvolutionChoices get() = if (id != WeaponId.REPEATER) 0 else {
-        val earned = (evolutionCredit / 50 - evolutionsChosen).coerceAtLeast(0)
-        val remainingRanks = RepeaterEvolution.entries.sumOf { 2 - rank(it) }
-        minOf(earned, remainingRanks)
+    // Public demo: 50 kills, then 100 more, then 150 more; three choices per run.
+    private val milestones = listOf(50, 150, 300)
+    val nextEvolutionCredit get() = milestones.getOrNull(evolutionsChosen) ?: 300
+    val isEvolutionComplete get() = evolutionsChosen >= milestones.size
+    val evolutionProgress get() = if (isEvolutionComplete) 1f else {
+        val previous = if (evolutionsChosen == 0) 0 else milestones[evolutionsChosen - 1]
+        ((evolutionCredit - previous).toFloat() / (nextEvolutionCredit - previous)).coerceIn(0f, 1f)
     }
+    val pendingEvolutionChoices get() = minOf(
+        (milestones.count { evolutionCredit >= it } - evolutionsChosen).coerceAtLeast(0),
+        EvolutionCatalog.available(this).sumOf { it.maxRank - rank(it) })
     val canEvolve get() = pendingEvolutionChoices > 0
-    fun bonus(stat: WeaponStat) = bonuses[stat] ?: 0f
-    fun scale(stat: WeaponStat) = 1f + bonus(stat)
-    fun rank(evolution: RepeaterEvolution) = evolutions[evolution] ?: 0
-    fun creditKills(count: Int = 1) { evolutionCredit += count }
+    internal var globalBonus: (WeaponStat) -> Float = { 0f }
+    internal var temporaryBonus: (WeaponStat) -> Float = { 0f }
+    fun bonus(stat: WeaponStat) = (bonuses[stat] ?: 0f) + EvolutionEffects.localBonus(this, stat) +
+        globalBonus(stat) + temporaryBonus(stat)
+    fun scale(stat: WeaponStat) = (1f + bonus(stat)).coerceAtLeast(0.05f)
+    fun rank(evolution: WeaponEvolution) = evolutions[evolution] ?: 0
+    fun has(evolution: WeaponEvolution) = rank(evolution) > 0
+    fun creditKills(count: Int = 1) { require(count >= 0); evolutionCredit += count }
     fun improve(effects: List<StatDelta>) {
         effects.forEach {
             if (it.stat == WeaponStat.EVOLUTION) creditKills(it.amount.toInt())
-            else bonuses[it.stat] = bonus(it.stat) + it.amount
+            else bonuses[it.stat] = (bonuses[it.stat] ?: 0f) + it.amount
         }
         level++
     }
-    fun evolve(evolution: RepeaterEvolution) {
-        require(rank(evolution) < 2)
+    fun evolve(evolution: WeaponEvolution) {
+        require(evolution.weapon == id && !isEvolutionComplete && evolution in EvolutionCatalog.available(this))
         evolutions[evolution] = rank(evolution) + 1
         evolutionsChosen++
         level++
     }
 }
 
-enum class RepeaterEvolution(val title: String, val first: String, val second: String) {
+enum class RepeaterEvolution(override val title: String, override val first: String, override val second: String) : WeaponEvolution {
     SHOTGUN("ショットガン", "発射体 +5 / 拡散 +400% / 基礎ダメージ −10", "発射体 +5 / 拡散 +100%"),
     RICOCHET("跳弾", "近くの敵へ3回跳弾。2体目以降は50%ダメージ。", "跳弾回数 +2"),
     FROST_FANG("フロストファング", "冷気ダメージ +10 / 凍結確率 3%", "冷気 +20 / キネティック −10"),
-    EXPLODING_BULLETS("爆発弾", "爆発 +10 / キネティック −10 / 命中時に範囲攻撃", "爆発 +15 / キネティック −10 / 爆発範囲を拡大")
+    EXPLODING_BULLETS("爆発弾", "爆発 +10 / キネティック −10 / 命中時に範囲攻撃", "爆発 +15 / キネティック −10 / 爆発範囲を拡大");
+    override val weapon get() = WeaponId.REPEATER
+    override val maxRank get() = 2
 }
 
 enum class UpgradeRarity(val title: String) { COMMON("コモン"), UNCOMMON("アンコモン"), RARE("レア") }
@@ -70,7 +82,7 @@ data class StatDelta(val stat: WeaponStat, val amount: Float)
 data class UpgradeOffer(
     val id: String, val weapon: WeaponId, val title: String, val description: String,
     val rarity: UpgradeRarity = UpgradeRarity.COMMON, val kind: OfferKind = OfferKind.UPGRADE,
-    val effects: List<StatDelta> = emptyList(), val evolution: RepeaterEvolution? = null
+    val effects: List<StatDelta> = emptyList(), val evolution: WeaponEvolution? = null
 )
 
 /** Catalog data describes effects. Applying them belongs to the world/arsenal. */
@@ -140,7 +152,7 @@ object UpgradeCatalog {
                     "Crit率 +" + (tier + 1) + "% / Crit倍率 +" + listOf(50, 100, 200)[tier] + "%", rarity,
                     effects = listOf(StatDelta(WeaponStat.CRIT, (tier + 1) / 100f),
                         StatDelta(WeaponStat.CRIT_MULTIPLIER, listOf(0.5f, 1f, 2f)[tier]))))
-                if (RepeaterEvolution.entries.any { world.mainWeapon.upgrades.rank(it) < 2 })
+                if (!world.mainWeapon.upgrades.isEvolutionComplete)
                     add(UpgradeOffer("repeater-learning-" + tier, WeaponId.REPEATER, learningNames[tier],
                         "進化の撃破カウント +" + percent, rarity,
                         effects = listOf(StatDelta(WeaponStat.EVOLUTION, percent.toFloat()))))
@@ -150,6 +162,12 @@ object UpgradeCatalog {
                     effects = listOf(StatDelta(WeaponStat.RANGE, 0.25f))))
         }
         world.secondaryWeapons.forEach { weapon ->
+            if (!weapon.state.isEvolutionComplete) UpgradeRarity.entries.forEachIndexed { tier, rarity ->
+                val count = (tier + 1) * 10
+                add(UpgradeOffer("${weapon.id}-evolution-$tier", weapon.id,
+                    EvolutionEffects.learningNames.getValue(weapon.id)[tier], "進化の撃破カウント +$count", rarity,
+                    effects = listOf(StatDelta(WeaponStat.EVOLUTION, count.toFloat()))))
+            }
             secondaryGroups[weapon.id].orEmpty().forEach { group ->
                 UpgradeRarity.entries.forEachIndexed { tier, rarity ->
                     val amount = (tier + 1) * 10
@@ -164,15 +182,12 @@ object UpgradeCatalog {
         }
     }
 
-    fun roll(world: CombatWorld, random: Random, evolution: Boolean = false): List<UpgradeOffer> {
-        val repeater = world.mainWeapon as? Repeater
-        val pool = if (evolution && repeater != null) RepeaterEvolution.entries.filter {
-            repeater.upgrades.rank(it) < 2
-        }.map {
-            val rank = repeater.upgrades.rank(it)
-            UpgradeOffer("evolve-" + it.name, WeaponId.REPEATER, it.title + if (rank == 1) " II" else "",
-                if (rank == 0) it.first else it.second, UpgradeRarity.RARE, OfferKind.EVOLUTION, evolution = it)
-        }.toMutableList() else pool(world).toMutableList()
+    fun roll(world: CombatWorld, random: Random, evolution: Boolean = false,
+             evolutionWeapon: WeaponId? = null): List<UpgradeOffer> {
+        val state = if (evolution) evolutionWeapon?.let(world::weaponState)
+            ?: world.weaponStates.firstOrNull { it.canEvolve } else null
+        val pool = (if (evolution) state?.let { world.evolutionOffers(it.id) }.orEmpty()
+            else pool(world)).toMutableList()
         val result = mutableListOf<UpgradeOffer>()
         while (result.size < 3 && pool.isNotEmpty()) {
             val weights = pool.map { when (it.rarity) { UpgradeRarity.COMMON -> 14; UpgradeRarity.UNCOMMON -> 5; UpgradeRarity.RARE -> 1 } }

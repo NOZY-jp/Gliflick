@@ -38,11 +38,19 @@ class CombatWorld(
     private val spawnDensity: EnemySpawnDensity = RandomEnemySpawnDensity()
 ) {
     val player = Player(config.playerMaxHp)
+    init {
+        (mainWeapon as? Repeater)?.upgrades?.globalBonus = { stat ->
+            EvolutionEffects.globalBonus(weaponStates, WeaponId.REPEATER, stat)
+        }
+    }
     private val mutableEnemies = mutableListOf<Enemy>()
     private val mutableProjectiles = mutableListOf<Projectile>()
     private val mutableBursts = mutableListOf<DeathBurst>()
     private val mutableHitFeedback = mutableListOf<HitFeedback>()
     private val mutableSecondaryWeapons = mutableListOf<SecondaryWeapon>()
+    private val mutableWeaponStates = mutableListOf<WeaponRunState>().apply {
+        (mainWeapon as? Repeater)?.upgrades?.let(::add)
+    }
     private val mutableActors = mutableListOf<WeaponActor>()
     private val mutableEffects = mutableListOf<WeaponEffect>()
     private val mutablePickups = mutableListOf<CombatPickup>()
@@ -125,9 +133,21 @@ class CombatWorld(
         if (id == WeaponId.REPEATER || secondaryWeapons.size >= 4 || secondaryWeapons.any { it.id == id }) return false
         val weapon = SecondaryWeaponFactory.create(id)
         mutableSecondaryWeapons += weapon
+        mutableWeaponStates += weapon.state
+        weapon.state.globalBonus = { stat -> EvolutionEffects.globalBonus(weaponStates, weapon.id, stat) }
         weapon.equip(this)
         return true
     }
+
+    val weaponStates: List<WeaponRunState> get() = mutableWeaponStates
+    fun weaponState(id: WeaponId) = weaponStates.firstOrNull { it.id == id }
+
+    private fun nextExtraLetters(): String = EvolutionCatalog.extraLetterGroups.firstOrNull { group ->
+        weaponStates.none { state -> group.all { it in state.extraTriggerLetters } }
+    }.orEmpty()
+    fun evolutionOffers(id: WeaponId): List<UpgradeOffer> = weaponState(id)?.let {
+        EvolutionCatalog.offers(it, nextExtraLetters())
+    }.orEmpty()
 
     fun applyUpgrade(offer: UpgradeOffer): Boolean = when (offer.kind) {
         OfferKind.ACQUIRE -> acquireWeapon(offer.weapon)
@@ -138,9 +158,13 @@ class CombatWorld(
             state != null
         }
         OfferKind.EVOLUTION -> {
-            val state = (mainWeapon as? Repeater)?.upgrades
-            if (state != null && state.canEvolve && offer.evolution != null && state.rank(offer.evolution) < 2) {
-                state.evolve(offer.evolution); true
+            val state = weaponState(offer.weapon)
+            if (state != null && state.canEvolve && offer.evolution != null &&
+                evolutionOffers(state.id).any { it.evolution == offer.evolution }) {
+                if (offer.evolution in EvolutionCatalog.triggerBranches) state.extraTriggerLetters += nextExtraLetters()
+                state.evolve(offer.evolution)
+                secondaryWeapons.firstOrNull { it.id == offer.weapon }?.onEvolved(this)
+                true
             } else false
         }
     }
@@ -164,6 +188,13 @@ class CombatWorld(
     fun nearestEnemy(position: Vec2, range: Float = Float.MAX_VALUE): Enemy? =
         enemies.filter { it.isAlive && (it.position - position).length() <= range + it.radius }
             .minByOrNull { (it.position - position).length() }
+    fun randomIndex(bound: Int) = random.nextInt(bound)
+    fun removePickups(kind: PickupKind) {
+        mutablePickups.filter { it.kind == kind }.toList().forEach {
+            mutablePickups.remove(it); events += CombatEvent.PickupRemoved(it.id)
+        }
+    }
+    var doubleDamageRemaining = 0f; private set
     fun randomAngle() = random.nextFloat() * kotlin.math.PI.toFloat() * 2f
     fun randomDirection() = randomAngle().let { Vec2(kotlin.math.cos(it), kotlin.math.sin(it)) }
     fun clampPoint(point: Vec2, margin: Float) = Vec2(
@@ -176,8 +207,8 @@ class CombatWorld(
     }
     fun addEffect(effect: WeaponEffect) { if (mutableEffects.size < 160) mutableEffects += effect }
     fun hasPickup(kind: PickupKind) = pickups.any { it.kind == kind }
-    fun spawnPickup(kind: PickupKind, position: Vec2): CombatPickup {
-        val pickup = CombatPickup(nextPickupId++, kind, position)
+    fun spawnPickup(kind: PickupKind, position: Vec2, fuelBonus: WeaponStat? = null): CombatPickup {
+        val pickup = CombatPickup(nextPickupId++, kind, position, fuelBonus = fuelBonus)
         mutablePickups += pickup
         events += CombatEvent.PickupSpawned(pickup)
         return pickup
@@ -185,19 +216,19 @@ class CombatWorld(
     fun activatePickup(id: Long) {
         val pickup = mutablePickups.firstOrNull { it.id == id } ?: return
         mutableSecondaryWeapons.forEach { it.activatePickup(this, pickup) }
-        mutablePickups.remove(pickup)
-        events += CombatEvent.PickupRemoved(id)
+        if (mutablePickups.remove(pickup)) events += CombatEvent.PickupRemoved(id)
     }
     fun dps(source: WeaponId): Float = damageSamples.filter { it.source == source }.sumOf { it.amount } /
         elapsedSeconds.coerceIn(1.0, 10.0).toFloat()
 
     fun areaDamage(position: Vec2, radius: Float, damage: Int, source: WeaponId, type: DamageType,
                    allowCrit: Boolean = true, excludedEnemy: Long? = null,
-                   criticalChance: Float? = null, criticalMultiplier: Float = 2f) {
+                   criticalChance: Float? = null, criticalMultiplier: Float? = null) {
         enemies.filter { it.isAlive && it.id != excludedEnemy && (it.position - position).length() <= radius + it.radius }
             .forEach { dealDamage(it.id, damage, source, type,
-                if (allowCrit) criticalChance ?: (0.01f + currentWeaponModifiers.criticalChanceBonus) else 0f,
-                criticalMultiplier) }
+                if (allowCrit) criticalChance ?: (0.01f + (weaponState(source)?.bonus(WeaponStat.CRIT) ?: 0f) +
+                    currentWeaponModifiers.criticalChanceBonus) else 0f,
+                criticalMultiplier ?: (2f + (weaponState(source)?.bonus(WeaponStat.CRIT_MULTIPLIER) ?: 0f))) }
     }
 
     fun damageEnemy(enemyId: Long, damage: Int, incomingAngle: Float? = null) {
@@ -208,21 +239,65 @@ class CombatWorld(
                    criticalChance: Float = 0f, criticalMultiplier: Float = 1.5f,
                    inflictStatus: Boolean = true, hitPosition: Vec2? = null, incomingAngle: Float? = null) {
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
-            val actual = if (random.nextFloat() < criticalChance) (damage * criticalMultiplier).roundToInt() else damage
+            val bleeding = it.statuses.any { status -> status.type == DamageType.KINETIC }
+            val bloodbathRank = weaponState(WeaponId.CHOPPER)?.rank(SecondaryEvolution.BLOODBATH) ?: 0
+            val bloodBonus = if (source == WeaponId.CHOPPER && bleeding && bloodbathRank > 0)
+                (if (bloodbathRank == 2) 0.25f else 0.1f) else 0f
+            val typedDamage = damage * (1f + EvolutionEffects.damageTypeBonus(weaponStates, type)) *
+                (1f + bloodBonus) * if (doubleDamageRemaining > 0f) 2f else 1f
+            val actual = (typedDamage * if (random.nextFloat() < criticalChance.coerceIn(0f, 1f)) criticalMultiplier else 1f).roundToInt()
             val applied = it.takeDamage(actual)
             if (applied > 0) {
                 val angle = incomingAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
                 mutableHitFeedback += HitFeedback(hitPosition ?: it.position, applied, it.radius, angle, random)
                 damageSamples += DamageSample(elapsedSeconds, source, applied)
-                if (inflictStatus && it.isAlive && random.nextFloat() < 0.03f &&
-                    type != DamageType.EXPLOSIVE && type != DamageType.COLD) {
-                    val existing = it.statuses.firstOrNull { status -> status.type == type }
-                    if (existing != null) existing.remaining = 5f
-                    else it.statuses += EnemyStatus(type, source)
-                }
+                if (inflictStatus && it.isAlive) applyAttackStatuses(it, source, type)
             }
-            if (!it.isAlive) die(it, awardExperience = true, source = source)
+            if (!it.isAlive) {
+                if (source == WeaponId.CHOPPER && bleeding && bloodbathRank > 0 &&
+                    random.nextFloat() < if (bloodbathRank == 2) 0.25f else 0.1f) doubleDamageRemaining = 10f
+                die(it, awardExperience = true, source = source)
+            }
         }
+    }
+
+    private fun applyAttackStatuses(enemy: Enemy, source: WeaponId, type: DamageType) {
+        val state = weaponState(source)
+        val saw = weaponState(WeaponId.CHOPPER)?.rank(SecondaryEvolution.SAW_LAUNCHER) ?: 0
+        fun roll(type: DamageType, chance: Float) {
+            if (chance <= 0f || random.nextFloat() >= chance) return
+            if (type == DamageType.COLD) { enemy.frozenSeconds = 2f; return }
+            val existing = enemy.statuses.firstOrNull { it.type == type }
+            if (existing != null) existing.remaining = 5f else enemy.statuses += EnemyStatus(type, source)
+        }
+        var chance = if (type == DamageType.CHEMICAL) 0.1f else if (type == DamageType.COLD) 0.03f else 0.03f
+        if (type == DamageType.ELECTRIC) {
+            if (weaponActors.any { it.source == WeaponId.TESLA_MINE && it.state.has(SecondaryEvolution.RESTRICTED_AREA) &&
+                (it.position - enemy.position).length() <= it.range + enemy.radius }) chance += 0.2f
+            if (state?.rank(SecondaryEvolution.STORM_RING) == 2) chance += 0.05f
+        }
+        if (type == DamageType.CHEMICAL && state?.rank(SecondaryEvolution.INFUSION) == 2) chance += 0.1f
+        if (type != DamageType.EXPLOSIVE) roll(type, chance)
+        if (source == WeaponId.BLADE_TRAP) {
+            val poison = state?.rank(SecondaryEvolution.POISON_COATING) ?: 0
+            if (poison > 0) roll(DamageType.CHEMICAL, if (poison == 2) 0.15f else 0.1f)
+            if (state?.has(SecondaryEvolution.SAWTOOTH_BLADES) == true)
+                roll(DamageType.KINETIC, 0.01f + state.bonus(WeaponStat.CRIT) + currentWeaponModifiers.criticalChanceBonus)
+        }
+        if (saw > 0 && source in listOf(WeaponId.CHOPPER, WeaponId.REPEATER))
+            roll(DamageType.KINETIC, if (saw == 2) 0.19f else 0.07f)
+    }
+
+    private fun statusDamage(type: DamageType): Int {
+        val extra = when (type) {
+            DamageType.ELECTRIC -> if (weaponStates.any { it.rank(SecondaryEvolution.RESTRICTED_AREA) == 2 }) 5 else 0
+            DamageType.HEAT -> if (weaponStates.any { it.rank(SecondaryEvolution.STABILIZED_PLASMA) == 2 }) 5 else 0
+            DamageType.KINETIC -> if (weaponStates.any { it.rank(SecondaryEvolution.SAWTOOTH_BLADES) == 2 }) 5 else 0
+            else -> 0
+        }
+        val saw = weaponState(WeaponId.CHOPPER)?.rank(SecondaryEvolution.SAW_LAUNCHER) ?: 0
+        val multiplier = if (type == DamageType.KINETIC && saw > 0) (if (saw == 2) 1.75f else 1.25f) else 1f
+        return (((if (type == DamageType.ELECTRIC) 3 else 10) + extra) * multiplier).roundToInt()
     }
 
     fun drainEvents(): List<CombatEvent> = events.toList().also { events.clear() }
@@ -243,6 +318,7 @@ class CombatWorld(
         mutableEnemies.forEach { enemy -> enemy.deathAge?.let { enemy.deathAge = it + dt } }
         mutableEnemies.removeAll { (it.deathAge ?: 0f) >= DEATH_FADE_SECONDS }
         if (isGameOver) return
+        doubleDamageRemaining = (doubleDamageRemaining - dt).coerceAtLeast(0f)
         currentWeaponModifiers = weaponModifiers
         elapsedSeconds += dt
         while (damageSamples.firstOrNull()?.let { it.time < elapsedSeconds - 10.0 } == true) damageSamples.removeFirst()
@@ -261,11 +337,11 @@ class CombatWorld(
                 status.cooldown -= dt
                 if (status.remaining > 0f && status.cooldown <= 0f) {
                     status.cooldown += 0.5f
-                    dealDamage(enemy.id, if (status.type == DamageType.ELECTRIC) 3 else 10,
+                    dealDamage(enemy.id, statusDamage(status.type),
                         status.source, status.type, inflictStatus = false)
                     if (status.type == DamageType.ELECTRIC) enemies.filter {
-                        it.isAlive && it.id != enemy.id && (it.position - enemy.position).length() <= 30f
-                    }.forEach { dealDamage(it.id, 3, status.source, status.type, inflictStatus = false) }
+                        it.isAlive && it.id != enemy.id && (it.position - enemy.position).length() <= 30f * if (weaponStates.any { state -> state.rank(SecondaryEvolution.RESTRICTED_AREA) == 2 }) 1.3f else 1f
+                    }.forEach { dealDamage(it.id, statusDamage(status.type), status.source, status.type, inflictStatus = false) }
                 }
             }
             enemy.statuses.removeAll { it.remaining <= 0f }
@@ -292,6 +368,22 @@ class CombatWorld(
         val spent = mutableSetOf<Projectile>()
         mutableProjectiles.forEach { projectile ->
             projectile.advance(dt)
+            if (projectile.penetrates) {
+                val hits = mutableEnemies.filter { it.isAlive && it.id !in projectile.hitEnemyIds }.mapNotNull { enemy ->
+                    sweptCircleHit(projectile.previousPosition - enemy.previousPosition,
+                        projectile.position - enemy.position, projectile.radius + enemy.radius)?.let { enemy to it }
+                }.sortedBy { it.second }
+                hits.forEach { (enemy, fraction) ->
+                    dealDamage(enemy.id, projectile.damage, projectile.source, projectile.damageType,
+                        projectile.criticalChance, projectile.criticalDamageMultiplier,
+                        hitPosition = enemy.previousPosition + (enemy.position - enemy.previousPosition) * fraction,
+                        incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x))
+                    if (projectile.hitEnemyIds.isEmpty()) projectile.damage = (projectile.damage * projectile.ricochetDamageMultiplier).roundToInt()
+                    projectile.hitEnemyIds += enemy.id
+                }
+                if (projectile.position.x !in -32f..width + 32f || projectile.position.y !in -32f..height + 32f) spent += projectile
+                return@forEach
+            }
             val hit = mutableEnemies.asSequence().filter { it.isAlive && it.id !in projectile.hitEnemyIds }.mapNotNull { enemy ->
                 sweptCircleHit(projectile.previousPosition - enemy.previousPosition,
                     projectile.position - enemy.position, projectile.radius + enemy.radius)
@@ -326,7 +418,7 @@ class CombatWorld(
                     projectile.velocity = direction * projectile.velocity.length()
                     projectile.position = enemyPositionAtImpact + direction * (hit.first.radius + projectile.radius + 0.1f)
                     projectile.previousPosition = projectile.position
-                    if (!projectile.hasRicocheted) { projectile.damage = (projectile.damage * 0.5f).roundToInt(); projectile.hasRicocheted = true }
+                    if (!projectile.hasRicocheted) { projectile.damage = (projectile.damage * projectile.ricochetDamageMultiplier).roundToInt(); projectile.hasRicocheted = true }
                     projectile.ricochets--
                 } else spent += projectile
             } else if (projectile.position.x !in -32f..width + 32f ||

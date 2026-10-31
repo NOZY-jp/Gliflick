@@ -43,3 +43,7 @@
 ## ゲーム中の設置体
 
 全11種に`app/src/main/res/raw/weapon_actor_*.svg`を用意する。これはカード用フォントの字形ではなく、公式のゲーム画像・映像と公開デモの描画から再構成した形である。Spectreの軌跡、Hunterの電撃、Guardianの火球、Orbiterの残像など動く部分は履歴・位相をCanvasへ渡して描く。武器別のファイル対応、形の根拠、編集方法は[武器アクターの外観](WeaponActorAppearance.md)にまとめる。
+
+## サブ武器進化と特殊燃料
+
+[全武器の進化](WeaponEvolutionDesign.md)で43枝を追加。`SecondaryEvolution`の`glyph`に公式コードポイント、`WeaponIconRenderer`に全枝のSVG対応を明示する。各`evolution_icon_<枝名>.svg`は公式Evolutionフォントの輪郭。特殊燃料の攻撃・速度・範囲はPickupフォントのU+003E/U+0040/U+003Fを`weapon_pickup_fuel_damage/speed/range.svg`として保存する。強化HunterとSaw Launcherの攻撃体は別の`weapon_actor_hunter_elite.svg`と`weapon_actor_chopper_saw.svg`を使う。

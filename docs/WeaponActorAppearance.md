@@ -54,3 +54,7 @@ Spectreは近接型にも移動処理を適用し、ターゲット付近で停�
 `SecondaryWeaponMotionTest`はSpectreの中央から遠方への移動・接触後の継続飛行・専用ダメージ、Hunterの移動と射撃、Orbiterの起点と公転、Guardianの追跡・火球・燃料停止を確認する。`WeaponVisualInstrumentedTest`は更新した実際のCombatActivityで11種を個別に発動し、画像を保存する。制御されたシーンでのAndroid描画確認であり、人のIME入力の根拠ではない。
 
 画像と結果は[外観確認](verification/weapon-visuals-20261031/README.md)へ記録する。
+
+## 撃破進化後の形
+
+[進化設計](WeaponEvolutionDesign.md)に対応。公開デモの`HunterDrone.on_render`の強化機は二枚の離れた三角翼で、専用`weapon_actor_hunter_elite.svg`を使う。`SpectreDrone.on_render`の強化機は通常の倍幅の軌跡・中心点・外周円。`chopperSawbladeModel`は12歯で外半径1、歯の谷.75、内半径.2を持ち、`weapon_actor_chopper_saw.svg`へ再構成した。Storm Ringは公開デモのオーブ周囲と軌跡の電撃、Tetherは実線接続を描く。効果がないカード字形への置き換えは行わない。

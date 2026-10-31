@@ -7,7 +7,7 @@ import android.graphics.Path
 import android.util.Xml
 import androidx.core.graphics.PathParser
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.R
-import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.RepeaterEvolution
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.*
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.WeaponId
 import org.xmlpull.v1.XmlPullParser
 import kotlin.math.max
@@ -21,7 +21,7 @@ class WeaponIconRenderer(private val context: Context) {
     private val icons = mutableMapOf<Int, SvgIcon>()
 
     fun draw(canvas: Canvas, id: WeaponId, x: Float, y: Float, radius: Float, color: Int,
-             evolution: RepeaterEvolution? = null) {
+             evolution: WeaponEvolution? = null) {
         drawResource(canvas, resourceFor(id, evolution), x, y, radius, color)
     }
 
@@ -29,8 +29,20 @@ class WeaponIconRenderer(private val context: Context) {
         drawResource(canvas, actorResource(id), x, y, radius, color)
     }
 
-    fun drawFuel(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
-        drawResource(canvas, R.raw.weapon_pickup_fuel, x, y, radius, color)
+    fun drawHunterElite(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) =
+        drawResource(canvas, R.raw.weapon_actor_hunter_elite, x, y, radius, color)
+
+    fun drawSaw(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) =
+        drawResource(canvas, R.raw.weapon_actor_chopper_saw, x, y, radius, color)
+
+    fun drawFuel(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int, bonus: WeaponStat? = null) {
+        val resource = when (bonus) {
+            WeaponStat.DAMAGE -> R.raw.weapon_pickup_fuel_damage
+            WeaponStat.SPEED -> R.raw.weapon_pickup_fuel_speed
+            WeaponStat.RANGE -> R.raw.weapon_pickup_fuel_range
+            else -> R.raw.weapon_pickup_fuel
+        }
+        drawResource(canvas, resource, x, y, radius, color)
     }
 
     fun drawSpectreSegment(canvas: Canvas, ax: Float, ay: Float, bx: Float, by: Float,
@@ -77,11 +89,56 @@ class WeaponIconRenderer(private val context: Context) {
         canvas.restore()
     }
 
-    private fun resourceFor(id: WeaponId, evolution: RepeaterEvolution?): Int = when (evolution) {
+    private fun resourceFor(id: WeaponId, evolution: WeaponEvolution?): Int = when (evolution) {
         RepeaterEvolution.FROST_FANG -> R.raw.evolution_icon_frost_fang
         RepeaterEvolution.RICOCHET -> R.raw.evolution_icon_ricochet
         RepeaterEvolution.SHOTGUN -> R.raw.evolution_icon_shotgun
         RepeaterEvolution.EXPLODING_BULLETS -> R.raw.evolution_icon_exploding_bullets
+        is SecondaryEvolution -> when (evolution) {
+            SecondaryEvolution.SUPERCHARGED -> R.raw.evolution_icon_supercharged
+            SecondaryEvolution.SELF_DESTRUCT -> R.raw.evolution_icon_self_destruct
+            SecondaryEvolution.VOLATILE_FUEL -> R.raw.evolution_icon_volatile_fuel
+            SecondaryEvolution.STALKING_ALGORITHMS -> R.raw.evolution_icon_stalking_algorithms
+            SecondaryEvolution.DEFENSE_GRID -> R.raw.evolution_icon_defense_grid
+            SecondaryEvolution.SOLID_CORE -> R.raw.evolution_icon_solid_core
+            SecondaryEvolution.WATCHER_SUPREME -> R.raw.evolution_icon_watcher_supreme
+            SecondaryEvolution.ABUNDANT_COILS -> R.raw.evolution_icon_abundant_coils
+            SecondaryEvolution.ELECTRICAL_BURN -> R.raw.evolution_icon_electrical_burn
+            SecondaryEvolution.RESTRICTED_AREA -> R.raw.evolution_icon_restricted_area
+            SecondaryEvolution.STORM_SOVEREIGN -> R.raw.evolution_icon_storm_sovereign
+            SecondaryEvolution.TWIN_HEADED -> R.raw.evolution_icon_twin_headed
+            SecondaryEvolution.BALL_LIGHTNING -> R.raw.evolution_icon_ball_lightning
+            SecondaryEvolution.STABILIZED_PLASMA -> R.raw.evolution_icon_stabilized_plasma
+            SecondaryEvolution.PRIME_RESONANCE -> R.raw.evolution_icon_prime_resonance
+            SecondaryEvolution.SURVEILLANCE -> R.raw.evolution_icon_surveillance
+            SecondaryEvolution.ICE_RAIN -> R.raw.evolution_icon_ice_rain
+            SecondaryEvolution.RELENTLESS -> R.raw.evolution_icon_relentless
+            SecondaryEvolution.SKY_SPOTTER -> R.raw.evolution_icon_sky_spotter
+            SecondaryEvolution.HUNTER_ELITE -> R.raw.evolution_icon_hunter_elite
+            SecondaryEvolution.ELECTRIFIED_BOLTS -> R.raw.evolution_icon_electrified_bolts
+            SecondaryEvolution.CHAIN_LIGHTNING -> R.raw.evolution_icon_chain_lightning
+            SecondaryEvolution.PREDATOR_STRAIN -> R.raw.evolution_icon_predator_strain
+            SecondaryEvolution.DUAL_WIELD -> R.raw.evolution_icon_dual_wield
+            SecondaryEvolution.FLAMING_BLADES -> R.raw.evolution_icon_flaming_blades
+            SecondaryEvolution.BOOMERANG -> R.raw.evolution_icon_boomerang
+            SecondaryEvolution.BLOODBATH -> R.raw.evolution_icon_bloodbath
+            SecondaryEvolution.SAW_LAUNCHER -> R.raw.evolution_icon_saw_launcher
+            SecondaryEvolution.MINELAYER -> R.raw.evolution_icon_minelayer
+            SecondaryEvolution.INFUSION -> R.raw.evolution_icon_infusion
+            SecondaryEvolution.HUNTER_SEEKER -> R.raw.evolution_icon_hunter_seeker
+            SecondaryEvolution.RECURSIVE_MINES -> R.raw.evolution_icon_recursive_mines
+            SecondaryEvolution.BLADE_REPOSITORY -> R.raw.evolution_icon_blade_repository
+            SecondaryEvolution.POISON_COATING -> R.raw.evolution_icon_poison_coating
+            SecondaryEvolution.SAWTOOTH_BLADES -> R.raw.evolution_icon_sawtooth_blades
+            SecondaryEvolution.CUTTING_EDGE -> R.raw.evolution_icon_cutting_edge
+            SecondaryEvolution.CONTINUUM -> R.raw.evolution_icon_continuum
+            SecondaryEvolution.STORM_RING -> R.raw.evolution_icon_storm_ring
+            SecondaryEvolution.DOPPELGANGER -> R.raw.evolution_icon_doppelganger
+            SecondaryEvolution.TETHER -> R.raw.evolution_icon_tether
+            SecondaryEvolution.TOXIC_WARD -> R.raw.evolution_icon_toxic_ward
+            SecondaryEvolution.EXPERIMENTAL_FUEL -> R.raw.evolution_icon_experimental_fuel
+            SecondaryEvolution.GUARDIAN_TEAM -> R.raw.evolution_icon_guardian_team
+        }
         null -> when (id) {
             WeaponId.REPEATER -> R.raw.weapon_icon_repeater
             WeaponId.SPECTRE -> R.raw.weapon_icon_spectre
@@ -96,6 +153,7 @@ class WeaponIconRenderer(private val context: Context) {
             WeaponId.ORBITER -> R.raw.weapon_icon_orbiter
             WeaponId.GUARDIAN -> R.raw.weapon_icon_guardian
         }
+        else -> error("No icon registered for evolution $evolution")
     }
 
     private fun load(resource: Int): SvgIcon {

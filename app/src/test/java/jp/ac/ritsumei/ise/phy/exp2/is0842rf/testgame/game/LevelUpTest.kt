@@ -178,12 +178,12 @@ class LevelUpTest {
 
     @Test fun noRerollIsSpentWhenAllRemainingEvolutionOptionsAreAlreadyVisible() {
         val session = session()
-        val state = (session.world.mainWeapon as Repeater).upgrades
-        RepeaterEvolution.entries.drop(1).forEach { state.evolve(it); state.evolve(it) }
-        state.creditKills(1000)
+        session.world.acquireWeapon(WeaponId.GUARDIAN)
+        val state = session.world.secondaryWeapons.single().state
+        state.creditKills(50)
         session.update(0f)
         assertTrue(session.handleSpace())
-        assertEquals(1, session.upgradeSelection!!.offers.size)
+        assertEquals(3, session.upgradeSelection!!.offers.size)
         assertFalse(session.canRerollUpgrades)
         assertFalse(session.rerollUpgrades())
         assertEquals(3, session.rerollsRemaining)

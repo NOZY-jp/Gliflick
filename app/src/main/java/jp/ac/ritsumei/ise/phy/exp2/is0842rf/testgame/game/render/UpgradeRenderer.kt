@@ -25,14 +25,15 @@ class UpgradeRenderer(context: Context) {
         paint.color = Color.rgb(239, 239, 229)
         canvas.drawRect(0f, 0f, width, height, paint)
         text(canvas, if (selection.evolution) "WEAPON EVOLUTION" else "LEVEL UP", 16f, 17f, 8.5f, accent, bold)
-        text(canvas, if (selection.evolution) "リピーターの進化" else "レベル " + selection.level,
+        text(canvas, if (selection.evolution) selection.offers.first().weapon.title + "の進化" else "レベル " + selection.level,
             16f, if (layout.compact) 39f else 45f, 21f, ink, bold)
         val summary = "装備 " + session.world.secondaryWeapons.size + "/4"
         text(canvas, summary, width - 16f, 18f, 9.5f, muted, align = Paint.Align.RIGHT)
-        val dps = String.format(Locale.US, "%.1f DPS", session.world.dps(WeaponId.REPEATER))
+        val displayedWeapon = if (selection.evolution) selection.offers.first().weapon else WeaponId.REPEATER
+        val dps = String.format(Locale.US, "%.1f DPS", session.world.dps(displayedWeapon))
         val dpsBaseline = if (selection.evolution && width < 360f)
             (if (layout.compact) 52f else 62f) else (if (layout.compact) 39f else 45f)
-        text(canvas, "リピーター  " + dps, width - 16f, dpsBaseline,
+        text(canvas, displayedWeapon.title + "  " + dps, width - 16f, dpsBaseline,
             9.5f, muted, align = Paint.Align.RIGHT)
         selection.offers.forEachIndexed { index, offer ->
             val box = layout.cards[index]
@@ -51,7 +52,7 @@ class UpgradeRenderer(context: Context) {
             fittedText(canvas, if (offer.kind == OfferKind.EVOLUTION) offer.title else offer.weapon.title,
                 box.left + 43f, box.top + if (layout.compact) 20f else 23f,
                 titleSize, box.width - 118f, bold)
-            text(canvas, if (offer.kind == OfferKind.EVOLUTION) "リピーター / 進化" else offer.weapon.tags,
+            text(canvas, if (offer.kind == OfferKind.EVOLUTION) offer.weapon.title + " / 進化" else offer.weapon.tags,
                 box.left + 43f, box.top + if (layout.compact) 31f else 35f, 8f, muted)
             text(canvas, offer.kind.title, box.right - 10f, box.top + 13f, 8f, accent, align = Paint.Align.RIGHT)
             if (offer.kind != OfferKind.ACQUIRE)

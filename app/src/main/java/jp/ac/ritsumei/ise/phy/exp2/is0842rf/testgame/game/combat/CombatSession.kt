@@ -45,13 +45,11 @@ class CombatSession(
     val pickupCaptions: List<PickupCaption> get() = mutablePickupCaptions
     var upgradeSelection: UpgradeSelection? = null; private set
     var rerollsRemaining = 3; private set
-    val pendingEvolutionChoices get() = (world.mainWeapon as? Repeater)?.upgrades?.pendingEvolutionChoices ?: 0
+    val pendingEvolutionChoices get() = world.weaponStates.sumOf { it.pendingEvolutionChoices }
     val pendingChoiceCount get() = world.pendingLevelUps + pendingEvolutionChoices
     val canRerollUpgrades get() = upgradeSelection?.let { selection ->
         rerollsRemaining > 0 && !selection.isChoosing && (!selection.evolution ||
-            ((world.mainWeapon as? Repeater)?.upgrades?.let { state ->
-                RepeaterEvolution.entries.count { state.rank(it) < 2 }
-            } ?: 0) > selection.offers.size)
+            world.evolutionOffers(selection.offers.first().weapon).size > selection.offers.size)
     } ?: false
     var inputEpoch = 0; private set
     val streak get() = engine.streak
@@ -115,8 +113,8 @@ class CombatSession(
         return true
     }
 
-    private fun createReward(evolution: Boolean): UpgradeSelection? {
-        val offers = UpgradeCatalog.roll(world, random, evolution)
+    private fun createReward(evolution: Boolean, evolutionWeapon: WeaponId? = null): UpgradeSelection? {
+        val offers = UpgradeCatalog.roll(world, random, evolution, evolutionWeapon)
         if (offers.isEmpty()) return null
         val words = mutableListOf<WordDefinition>()
         playableDefinitions.filter { it.readingLength == 3 }.shuffled(random).forEach { candidate ->
@@ -138,7 +136,7 @@ class CombatSession(
     fun rerollUpgrades(): Boolean {
         val selection = upgradeSelection ?: return false
         if (!canRerollUpgrades) return false
-        val rerolled = createReward(selection.evolution) ?: return false
+        val rerolled = createReward(selection.evolution, selection.offers.first().weapon) ?: return false
         rerollsRemaining--
         upgradeSelection = rerolled
         pendingTokens = emptyList()
