@@ -1,14 +1,15 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.render
 
+import android.content.Context
 import android.graphics.*
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.*
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.splitTextCharacters
 import java.util.Locale
 import kotlin.math.min
 
-class UpgradeRenderer {
+class UpgradeRenderer(context: Context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val icons = WeaponIconRenderer()
+    private val icons = WeaponIconRenderer(context)
     private val ink = Color.rgb(70, 70, 70)
     private val muted = Color.rgb(117, 117, 110)
     private val accent = Color.rgb(158, 91, 96)
@@ -44,9 +45,8 @@ class UpgradeRenderer {
             paint.color = if (selected) accent else Color.rgb(199, 199, 188)
             canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, 4f, 4f, paint)
             paint.style = Paint.Style.FILL
-            paint.color = accent
-            canvas.drawRoundRect(box.left + 10f, box.top + 10f, box.left + 35f, box.top + 35f, 2f, 2f, paint)
-            icons.draw(canvas, offer.weapon, box.left + 22.5f, box.top + 22.5f, 10f, Color.rgb(247, 247, 239))
+            icons.draw(canvas, offer.weapon, box.left + 22.5f, box.top + 22.5f, 12.5f,
+                accent, offer.evolution)
             val titleSize = if (layout.landscape) 18f else 16f
             fittedText(canvas, if (offer.kind == OfferKind.EVOLUTION) offer.title else offer.weapon.title,
                 box.left + 43f, box.top + if (layout.compact) 20f else 23f,

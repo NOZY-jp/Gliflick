@@ -28,8 +28,8 @@ import kotlin.math.min
 
 /** Presentation only: no matching, damage, spawning, or weapon timing. Coordinates are logical dp. */
 class CombatRenderer(context: Context) {
-    private val secondaryRenderer = SecondaryWeaponRenderer()
-    private val upgradeRenderer = UpgradeRenderer()
+    private val secondaryRenderer = SecondaryWeaponRenderer(context)
+    private val upgradeRenderer = UpgradeRenderer(context)
     private val gridBackground = GridBackgroundRenderer(context)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ink = Color.rgb(70, 70, 70)

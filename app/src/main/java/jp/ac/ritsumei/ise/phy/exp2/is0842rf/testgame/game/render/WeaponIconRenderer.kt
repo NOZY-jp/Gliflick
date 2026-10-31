@@ -1,57 +1,87 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.render
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.util.Xml
+import androidx.core.graphics.PathParser
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.R
+import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.RepeaterEvolution
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.WeaponId
-import kotlin.math.*
+import org.xmlpull.v1.XmlPullParser
+import kotlin.math.max
 
-/** Small native vector marks remain legible at phone HUD sizes. */
-class WeaponIconRenderer {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    fun draw(canvas: Canvas, id: WeaponId, x: Float, y: Float, radius: Float, color: Int) {
+/** Draws editable SVG paths based on Glyphica's official wiki icon fonts. */
+class WeaponIconRenderer(private val context: Context) {
+    private data class SvgIcon(val path: Path, val left: Float, val top: Float,
+                               val width: Float, val height: Float)
+
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val icons = mutableMapOf<Int, SvgIcon>()
+
+    fun draw(canvas: Canvas, id: WeaponId, x: Float, y: Float, radius: Float, color: Int,
+             evolution: RepeaterEvolution? = null) {
+        val resource = resourceFor(id, evolution)
+        val icon = icons.getOrPut(resource) { load(resource) }
         canvas.save()
         canvas.translate(x, y)
-        canvas.scale(radius, radius)
+        val scale = radius * 2f / max(icon.width, icon.height)
+        canvas.scale(scale, scale)
+        canvas.translate(-(icon.left + icon.width / 2f), -(icon.top + icon.height / 2f))
         paint.color = color
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 0.12f
-        fun line(x1: Float, y1: Float, x2: Float, y2: Float) = canvas.drawLine(x1, y1, x2, y2, paint)
-        fun polygon(sides: Int, r: Float = 0.8f, offset: Float = -PI.toFloat() / 2) {
-            val path = Path()
-            repeat(sides) {
-                val a = offset + it * 2f * PI.toFloat() / sides
-                val px = cos(a) * r; val py = sin(a) * r
-                if (it == 0) path.moveTo(px, py) else path.lineTo(px, py)
-            }
-            path.close(); canvas.drawPath(path, paint)
-        }
-        when (id) {
-            WeaponId.REPEATER -> repeat(3) { i -> line(-0.65f, -0.55f + i * 0.5f, 0.45f, -0.8f + i * 0.5f) }
-            WeaponId.SPECTRE -> { polygon(3); line(-0.4f, 0.65f, 0f, 0.35f); line(0.4f, 0.65f, 0f, 0.35f) }
-            WeaponId.HUNTER -> { polygon(3); canvas.drawCircle(0f, 0f, 0.25f, paint) }
-            WeaponId.SENTRY -> { canvas.drawCircle(0f, 0f, 0.58f, paint); line(0f, 0f, 0f, -0.95f); line(-0.8f, 0.7f, 0.8f, 0.7f) }
-            WeaponId.TESLA_MINE -> {
-                polygon(4); val p = Path(); p.moveTo(0.2f, -0.7f); p.lineTo(-0.25f, 0f)
-                p.lineTo(0.2f, 0f); p.lineTo(-0.2f, 0.7f); canvas.drawPath(p, paint)
-            }
-            WeaponId.OSCILLATOR -> {
-                val p = Path()
-                for (i in 0..20) { val px = -0.85f + i * 0.085f; val py = sin(px * 7f) * 0.45f
-                    if (i == 0) p.moveTo(px, py) else p.lineTo(px, py) }
-                canvas.drawPath(p, paint)
-            }
-            WeaponId.METEOR -> { canvas.drawCircle(0f, 0f, 0.6f, paint); line(-0.9f, 0f, 0.9f, 0f); line(0f, -0.9f, 0f, 0.9f) }
-            WeaponId.CHOPPER, WeaponId.BLADE_TRAP -> {
-                canvas.drawCircle(0f, 0f, 0.2f, paint)
-                repeat(4) { canvas.rotate(90f); val p = Path(); p.moveTo(0f, -0.2f)
-                    p.lineTo(0.35f, -0.75f); p.lineTo(-0.15f, -0.85f); p.close(); canvas.drawPath(p, paint) }
-            }
-            WeaponId.MINEFIELD -> { polygon(6, 0.6f); repeat(6) {
-                val a = it * PI.toFloat() / 3f; line(cos(a) * 0.6f, sin(a) * 0.6f, cos(a) * 0.9f, sin(a) * 0.9f) } }
-            WeaponId.ORBITER -> { canvas.drawOval(-0.9f, -0.5f, 0.9f, 0.5f, paint); canvas.drawCircle(0.65f, -0.3f, 0.2f, paint) }
-            WeaponId.GUARDIAN -> { polygon(5); canvas.drawCircle(0f, 0f, 0.4f, paint); line(-0.65f, 0f, 0.65f, 0f) }
-        }
+        canvas.drawPath(icon.path, paint)
         canvas.restore()
+    }
+
+    private fun resourceFor(id: WeaponId, evolution: RepeaterEvolution?): Int = when (evolution) {
+        RepeaterEvolution.FROST_FANG -> R.raw.evolution_icon_frost_fang
+        RepeaterEvolution.RICOCHET -> R.raw.evolution_icon_ricochet
+        RepeaterEvolution.SHOTGUN -> R.raw.evolution_icon_shotgun
+        RepeaterEvolution.EXPLODING_BULLETS -> R.raw.evolution_icon_exploding_bullets
+        null -> when (id) {
+            WeaponId.REPEATER -> R.raw.weapon_icon_repeater
+            WeaponId.SPECTRE -> R.raw.weapon_icon_spectre
+            WeaponId.SENTRY -> R.raw.weapon_icon_sentry
+            WeaponId.TESLA_MINE -> R.raw.weapon_icon_tesla_mine
+            WeaponId.OSCILLATOR -> R.raw.weapon_icon_oscillator
+            WeaponId.METEOR -> R.raw.weapon_icon_meteor
+            WeaponId.HUNTER -> R.raw.weapon_icon_hunter
+            WeaponId.CHOPPER -> R.raw.weapon_icon_chopper
+            WeaponId.MINEFIELD -> R.raw.weapon_icon_minefield
+            WeaponId.BLADE_TRAP -> R.raw.weapon_icon_blade_trap
+            WeaponId.ORBITER -> R.raw.weapon_icon_orbiter
+            WeaponId.GUARDIAN -> R.raw.weapon_icon_guardian
+        }
+    }
+
+    private fun load(resource: Int): SvgIcon {
+        val parser = Xml.newPullParser()
+        var left = 0f
+        var top = 0f
+        var width = 1000f
+        var height = 1000f
+        var pathData: String? = null
+        context.resources.openRawResource(resource).use { input ->
+            parser.setInput(input, "UTF-8")
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType != XmlPullParser.START_TAG) continue
+                when (parser.name) {
+                    "svg" -> parser.getAttributeValue(null, "viewBox")?.let { viewBox ->
+                        val bounds = viewBox.trim().split(Regex("[ ,]+"))
+                            .map(String::toFloat)
+                        require(bounds.size == 4 && bounds[2] > 0f && bounds[3] > 0f) {
+                            "SVG viewBox must contain x, y, width, height."
+                        }
+                        left = bounds[0]; top = bounds[1]; width = bounds[2]; height = bounds[3]
+                    }
+                    "path" -> if (pathData == null) pathData = parser.getAttributeValue(null, "d")
+                }
+            }
+        }
+        val path = PathParser.createPathFromPathData(requireNotNull(pathData) {
+            "The weapon SVG needs a path element."
+        }) ?: error("Could not parse weapon SVG path.")
+        return SvgIcon(path, left, top, width, height)
     }
 }

@@ -22,7 +22,7 @@
 - Every projectile freezes its own direction at emission and uses earliest swept collision, including non-target enemies. A queued burst survives target death and fires remaining shots toward the last known point.
 - Damage feedback starts at the enemy's interpolated centre at hit time and is created from that position, damage value, and incoming projectile angle in CombatWorld; muted-ink fragments travel at Θ ± 60°. CombatRenderer only draws it. Show enemy health bars only below maximum HP and keep impact numbers, rings, and fragments tied to that hit's lifetime.
 
-- Level-up selection and secondary weapon work must read docs/LevelUpDesign.md. WeaponCatalog owns upgrade data; SecondaryWeapon controllers own activation; CombatWorld owns damage/XP/pickups; renderers only present. Pause all simulation clocks during choices and preserve queued rewards. Glyph triggers use the dictionary's standard Roman spelling equally for kana and Roman input; this is game-rule metadata, never reconstructed physical input or a new matcher stream.
+- Level-up selection and secondary weapon work must read docs/LevelUpDesign.md. WeaponCatalog owns upgrade data; SecondaryWeapon controllers own activation; CombatWorld owns damage/XP/pickups; renderers only present. Pause all simulation clocks during choices and preserve queued rewards. Glyph triggers use the dictionary's standard Roman spelling equally for kana and Roman input; this is game-rule metadata, never reconstructed physical input or a new matcher stream. Weapon/evolution artwork stays editable in `app/src/main/res/raw/weapon_icon_*.svg` and `evolution_icon_*.svg`, sourced from the official wiki icon fonts; update those paths instead of sketching replacement glyphs in the renderer.
 
 ## Version control
 

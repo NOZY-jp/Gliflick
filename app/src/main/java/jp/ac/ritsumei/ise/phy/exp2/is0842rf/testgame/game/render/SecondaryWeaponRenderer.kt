@@ -1,12 +1,13 @@
 package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.render
 
+import android.content.Context
 import android.graphics.*
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.*
 import kotlin.math.*
 
-class SecondaryWeaponRenderer {
+class SecondaryWeaponRenderer(context: Context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val icons = WeaponIconRenderer()
+    private val icons = WeaponIconRenderer(context)
     private val ink = Color.rgb(117, 117, 110)
     private fun color(type: DamageType): Int = when (type) {
         DamageType.HEAT -> Color.rgb(158, 91, 96)
