@@ -1,5 +1,7 @@
 # Glyphica公式アイコンのSVG
 
+![武器12種と進化4種のアイコン一覧](verification/glyphica-icons-20261031.png)
+
 ## 出典と変換
 
 [Glyphica公式Wiki](https://alias.black/glyphica/wiki_english.html)の各武器見出しは `Title-Icons-Glyphica.ttf` の字形を、Repeater進化一覧は `Evolution-Icons-Glyphica.ttf` の字形を使っている。Wikiに表示されるコードポイントの輪郭をSVGの`path`へ変換した。アプリへはフォントを埋め込まず、編集できるSVGをそのまま`res/raw`から読み込む。
