@@ -12,6 +12,16 @@ data class CompletedCombatWord(val word: WordDefinition, val targetId: Long, val
 }
 
 enum class WeaponVisualKind { DRONE, SENTRY, TESLA, BLADE, ORB, MINE, BOMBARDMENT, GUARDIAN }
+
+/** Local geometry tuning shared by collision and drawing, independent of run upgrades. */
+object WeaponSizeTuning {
+    const val AREA_WEAPON_SCALE = 1.5f
+    fun forWeapon(id: WeaponId): Float = when (id) {
+        WeaponId.TESLA_MINE, WeaponId.METEOR, WeaponId.CHOPPER, WeaponId.MINEFIELD,
+        WeaponId.BLADE_TRAP, WeaponId.ORBITER, WeaponId.GUARDIAN -> AREA_WEAPON_SCALE
+        WeaponId.REPEATER, WeaponId.SPECTRE, WeaponId.SENTRY, WeaponId.OSCILLATOR, WeaponId.HUNTER -> 1f
+    }
+}
 enum class PickupKind(val title: String) { METEOR("爆撃照準"), FUEL("燃料") }
 class CombatPickup(val id: Long, val kind: PickupKind, var position: Vec2, val lifetime: Float = 14f) {
     var age = 0f
@@ -56,7 +66,8 @@ abstract class WeaponActor(
     private val mutableTrail = ArrayDeque<Vec2>().apply { add(position) }
     val trail: List<Vec2> get() = mutableTrail.toList()
     val source get() = state.id
-    val range get() = baseRange * state.scale(WeaponStat.RANGE)
+    val sizeScale get() = WeaponSizeTuning.forWeapon(source)
+    val range get() = baseRange * sizeScale * state.scale(WeaponStat.RANGE)
     val damage get() = (baseDamage * state.scale(WeaponStat.DAMAGE)).roundToInt().coerceAtLeast(1)
     val durationFraction get() = (remaining / initialDuration).coerceIn(0f, 1f)
     protected val hitTimes = mutableMapOf<Long, Double>()
@@ -210,7 +221,7 @@ class FieldActor(state: WeaponRunState, position: Vec2, kind: WeaponVisualKind,
                 val relative = enemy.position - position
                 val projection = atan2(relative.y, relative.x) - angle
                 val spokeDistance = min(abs(sin(projection)), abs(cos(projection))) * relative.length()
-                if (spokeDistance <= enemy.radius + 2.5f) hit(world, enemy, 0.16f)
+                if (spokeDistance <= enemy.radius + 2.5f * sizeScale) hit(world, enemy, 0.16f)
             }
         } else {
             cooldown -= dt
@@ -241,7 +252,8 @@ class MovingBladeActor(state: WeaponRunState, position: Vec2, private val veloci
             if (sweptCircleHit(previous - enemy.previousPosition, position - enemy.position, range + enemy.radius) != null)
                 hit(world, enemy, 0.22f)
         }
-        if (position.x !in -32f..world.width + 32f || position.y !in -32f..world.height + 32f) finished = true
+        val margin = max(32f, range)
+        if (position.x !in -margin..world.width + margin || position.y !in -margin..world.height + margin) finished = true
     }
 }
 
@@ -254,7 +266,7 @@ class MineActor(state: WeaponRunState, position: Vec2, private val direction: Ve
         position += direction * (18f * state.scale(WeaponStat.SPEED) * dt)
         angle += dt * 4.7f
         val hit = world.enemies.any { it.isAlive &&
-            sweptCircleHit(previous - it.previousPosition, position - it.position, 4f + it.radius) != null }
+            sweptCircleHit(previous - it.previousPosition, position - it.position, 4f * sizeScale + it.radius) != null }
         if (hit) {
             world.areaDamage(position, range, damage, source, type)
             world.addEffect(WeaponEffect(position, position, type, range, 0.35f, source))

@@ -45,7 +45,7 @@ class SecondaryWeaponRenderer(context: Context) {
                 }
                 WeaponId.TESLA_MINE -> {
                     circle(canvas, p, body.range, 48)
-                    actor(canvas, body.source, p, 4.5f, body.angle)
+                    actor(canvas, body.source, p, 4.5f * body.sizeScale, body.angle)
                 }
                 WeaponId.CHOPPER -> {
                     paint.style = Paint.Style.FILL; paint.color = ink(22)
@@ -58,7 +58,7 @@ class SecondaryWeaponRenderer(context: Context) {
                 WeaponId.BLADE_TRAP -> actor(canvas, body.source, p, body.range, body.angle)
                 WeaponId.MINEFIELD -> {
                     circle(canvas, p, body.range * 0.5f, 48)
-                    actor(canvas, body.source, p, 4f, body.angle)
+                    actor(canvas, body.source, p, 4f * body.sizeScale, body.angle)
                 }
                 WeaponId.ORBITER -> {
                     val direction = (p - world.player.position).normalized()
@@ -79,7 +79,7 @@ class SecondaryWeaponRenderer(context: Context) {
                     actor(canvas, body.source, p, body.range, alpha = 80)
                 }
                 WeaponId.GUARDIAN -> drawGuardian(canvas, body as GuardianActor, world)
-                WeaponId.METEOR -> actor(canvas, body.source, p, 8f, body.age * 0.6f, 125)
+                WeaponId.METEOR -> actor(canvas, body.source, p, 8f * body.sizeScale, body.age * 0.6f, 125)
                 WeaponId.REPEATER, WeaponId.OSCILLATOR -> Unit
             }
         }
@@ -105,7 +105,8 @@ class SecondaryWeaponRenderer(context: Context) {
         }
         world.pickups.forEach { pickup ->
             val p = pickup.position
-            if (pickup.kind == PickupKind.METEOR) actor(canvas, WeaponId.METEOR, p, 8f, pickup.age * 0.6f)
+            if (pickup.kind == PickupKind.METEOR) actor(canvas, WeaponId.METEOR, p,
+                8f * WeaponSizeTuning.forWeapon(WeaponId.METEOR), pickup.age * 0.6f)
             else icons.drawFuel(canvas, p.x, p.y, 7f, ink(190))
             paint.style = Paint.Style.FILL; paint.color = Color.rgb(199, 199, 188)
             canvas.drawRect(p.x - 10f, p.y + 13f, p.x + 10f, p.y + 14.5f, paint)

@@ -37,6 +37,8 @@ tags: [project/glyphica-android, weapons, visuals]
 
 `WeaponIconRenderer.actorResource()`は全武器を列挙し、カードアイコンへの汎用フォールバックを持たない。静的シルエットは単一のSVG pathとviewBoxで編集できる。輪郭や切り抜きはevenoddの複合path。SpectreのSVGは軌跡の1区間として伸縮し、移動履歴に沿って並べる。
 
+エリア型7種（Tesla Mine・Meteor・Chopper・Minefield・Blade Trap・Orbiter・Guardian）は`WeaponSizeTuning`で本体・効果範囲・当たり判定を基準の1.5倍にする。SVGの比率を保ったまま描画側にも同じ倍率を使う。Orbiterは球の大きさだけを変更し、敵の地点から決まる公転経路は維持する。[サイズ調整後の記録](verification/area-size-20261031/README.md)。
+
 燃料Pickupの`weapon_pickup_fuel.svg`は、デモが実際に使う`Pickup-Icons-Glyphica.ttf`のU+003Dから輪郭を変換した。WikiのGuardian武器アイコンをPickupへ流用しない。参照スクリプト取得時のSHA-256は`BC625353FB2900AADB5DC30B70048228BFF4958BB23C4060DF70F2AC9AFA7E42`。
 
 ## 動きと責務

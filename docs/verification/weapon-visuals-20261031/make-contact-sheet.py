@@ -7,9 +7,11 @@ root = Path(__file__).parent
 directory = root / (sys.argv[1] if len(sys.argv) > 1 else 'emulator')
 weapons = ['spectre', 'hunter', 'sentry', 'tesla_mine', 'oscillator', 'meteor',
            'chopper', 'minefield', 'blade_trap', 'orbiter', 'guardian']
+if len(sys.argv) > 3:
+    weapons = sys.argv[3].split(',')
 font = ImageFont.truetype('C:/Windows/Fonts/segoeui.ttf', 22)
 width, height = 420, 365
-sheet = Image.new('RGB', (width * 3, height * 4), '#efefe5')
+sheet = Image.new('RGB', (width * 3, height * ((len(weapons) + 2) // 3)), '#efefe5')
 draw = ImageDraw.Draw(sheet)
 for index, weapon in enumerate(weapons):
     image = Image.open(directory / f'weapon-{weapon}.png').convert('RGB')
@@ -21,5 +23,6 @@ for index, weapon in enumerate(weapons):
     sheet.paste(crop, (x + (width-crop.width)//2, y+38))
     draw.text((x+16, y+8), weapon.replace('_', ' ').title(), font=font, fill='#464646')
     draw.rectangle((x, y, x+width-1, y+height-1), outline='#c7c7bc')
-sheet.save(root / f'{directory.name}-contact-sheet.png')
-print(root / f'{directory.name}-contact-sheet.png')
+output = Path(sys.argv[2]) if len(sys.argv) > 2 else root / f'{directory.name}-contact-sheet.png'
+sheet.save(output)
+print(output)

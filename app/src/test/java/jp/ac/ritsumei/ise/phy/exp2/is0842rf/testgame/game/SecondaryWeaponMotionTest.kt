@@ -10,6 +10,17 @@ class SecondaryWeaponMotionTest {
     private fun world() = CombatWorld(CombatConfig(spawningEnabled = false), Random(17))
         .also { it.resize(400f, 500f) }
 
+    @Test fun expandedTeslaFieldHitsBeyondOldFootprintButNotOutsideNewArea() {
+        val world = world()
+        val inside = world.spawnEnemy(Vec2(150f, 100f), EnemyDefinition(maxHp = 1000, speed = 0f))
+        val outside = world.spawnEnemy(Vec2(168f, 100f), EnemyDefinition(maxHp = 1000, speed = 0f))
+        world.addActor(FieldActor(WeaponRunState(WeaponId.TESLA_MINE), Vec2(100f, 100f),
+            WeaponVisualKind.TESLA, 32f, 12f, 38f, DamageType.ELECTRIC))
+        world.update(1f / 120f)
+        assertTrue("The enlarged field must reach the annulus outside its old radius", inside.hp < 1000)
+        assertEquals("Enemies beyond the enlarged field must remain untouched", 1000, outside.hp)
+    }
+
     @Test fun spectreLeavesPlayerReachesRemoteEnemyAndKeepsFlying() {
         val world = world()
         val target = world.spawnEnemy(Vec2(330f, 250f), EnemyDefinition(maxHp = 100000, speed = 0f))
