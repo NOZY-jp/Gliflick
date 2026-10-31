@@ -18,6 +18,13 @@ class SecondaryWeaponRenderer(context: Context) {
         else -> ink
     }
     fun draw(canvas: Canvas, world: CombatWorld) {
+        if (world.weaponActors.any { it.visual == WeaponVisualKind.GUARDIAN }) {
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 0.55f
+            paint.color = ink
+            paint.alpha = 55
+            canvas.drawCircle(world.player.position.x, world.player.position.y, 22f, paint)
+        }
         world.weaponActors.forEach { actor ->
             val p = actor.position
             paint.color = color(actor.type); paint.alpha = if (actor.active) 155 else 45
@@ -26,7 +33,9 @@ class SecondaryWeaponRenderer(context: Context) {
                 WeaponVisualKind.TESLA -> {
                     paint.alpha = 38
                     canvas.drawCircle(p.x, p.y, actor.range, paint)
-                    icons.draw(canvas, actor.source, p.x, p.y, 6f, color(actor.type))
+                    icons.drawTeslaMineActor(canvas, p.x, p.y, 6f,
+                        Color.argb(if (actor.active) 190 else 55, Color.red(color(actor.type)),
+                            Color.green(color(actor.type)), Color.blue(color(actor.type))))
                 }
                 WeaponVisualKind.BOMBARDMENT -> {
                     paint.alpha = 70

@@ -90,7 +90,7 @@ class UpgradeRenderer(context: Context) {
         val reroll = layout.reroll
         paint.color = Color.rgb(228, 228, 216)
         canvas.drawRoundRect(reroll.left, reroll.top, reroll.right, reroll.bottom, 3f, 3f, paint)
-        text(canvas, "リロール  " + session.rerollsRemaining, reroll.centerX, reroll.top + 17.5f, 11f,
+        text(canvas, "リロール [␣] ×" + session.rerollsRemaining, reroll.centerX, reroll.top + 17.5f, 11f,
             if (session.canRerollUpgrades) ink else Color.rgb(174, 174, 164), align = Paint.Align.CENTER)
         canvas.restoreToCount(layer)
     }

@@ -101,6 +101,7 @@ class CombatRenderer(context: Context) {
         session.pickupCaptions.forEach {
             drawCaption(canvas, it.state, it.pickup.position, 1f, 1f, width, false, 9f)
         }
+        drawPendingRewardPrompt(canvas, session)
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
         drawTypingBonuses(canvas, session, width)
@@ -134,6 +135,57 @@ class CombatRenderer(context: Context) {
         canvas.drawRect(p.x - 21f, p.y + 29f, p.x - 21f + 42f * world.player.hp / world.player.maxHp,
             p.y + 32f, paint)
         centered(canvas, "${world.player.hp} / ${world.player.maxHp}", p.x, p.y + 46f, 10f, muted)
+    }
+
+    private fun drawPendingRewardPrompt(canvas: Canvas, session: CombatSession) {
+        if (session.upgradeSelection != null || session.pendingChoiceCount == 0) return
+        val levels = session.world.pendingLevelUps
+        val evolutions = session.pendingEvolutionChoices
+        val label = when {
+            levels > 0 && evolutions > 0 -> "強化選択"
+            levels > 0 -> "レベルアップ"
+            else -> "武器進化"
+        }
+        val player = session.world.player
+        val baseline = player.position.y - player.radius - 13f
+        val labelSize = 9f
+        val keySize = 8.5f
+        val keyWidth = 17f
+        val keyHeight = 13f
+        val count = "×${session.pendingChoiceCount}"
+        paint.typeface = light
+        paint.textSize = labelSize
+        val labelWidth = paint.measureText(label)
+        paint.textSize = labelSize
+        val countWidth = paint.measureText(count)
+        val totalWidth = labelWidth + 4f + keyWidth + 4f + countWidth
+        var x = player.position.x - totalWidth / 2f
+        paint.color = muted
+        paint.textSize = labelSize
+        paint.textAlign = Paint.Align.LEFT
+        canvas.drawText(label, x, baseline, paint)
+        x += labelWidth + 4f
+        val top = baseline - keyHeight + 2f
+        paint.style = Paint.Style.FILL
+        paint.color = Color.rgb(247, 247, 239)
+        canvas.drawRoundRect(x, top, x + keyWidth, top + keyHeight, 2.5f, 2.5f, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 0.8f
+        paint.color = Color.rgb(151, 151, 143)
+        canvas.drawRoundRect(x, top, x + keyWidth, top + keyHeight, 2.5f, 2.5f, paint)
+        paint.style = Paint.Style.FILL
+        paint.color = ink
+        paint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        paint.textSize = keySize
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText("␣", x + keyWidth / 2f, top + 9.4f, paint)
+        x += keyWidth + 4f
+        paint.typeface = light
+        paint.textSize = labelSize
+        paint.textAlign = Paint.Align.LEFT
+        paint.color = muted
+        canvas.drawText(count, x, baseline, paint)
+        paint.style = Paint.Style.FILL
     }
 
     private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int, aboveEnemy: Boolean) {

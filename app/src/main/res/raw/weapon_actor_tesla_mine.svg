@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <!-- Deployed actor silhouette: thin triangular outline; separate from the official level-up glyph. -->
+  <path fill="#000000" fill-rule="evenodd" d="M50 8 L94 90 L6 90 Z M50 25 L26 78 L74 78 Z"/>
+</svg>

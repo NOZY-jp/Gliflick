@@ -32,8 +32,12 @@ class WeaponRunState(val id: WeaponId) {
     var evolutionCredit = 0; private set
     var evolutionsChosen = 0; private set
     val nextEvolutionCredit get() = (evolutionsChosen + 1) * 50
-    val canEvolve get() = id == WeaponId.REPEATER && evolutionCredit >= nextEvolutionCredit &&
-        RepeaterEvolution.entries.any { rank(it) < 2 }
+    val pendingEvolutionChoices get() = if (id != WeaponId.REPEATER) 0 else {
+        val earned = (evolutionCredit / 50 - evolutionsChosen).coerceAtLeast(0)
+        val remainingRanks = RepeaterEvolution.entries.sumOf { 2 - rank(it) }
+        minOf(earned, remainingRanks)
+    }
+    val canEvolve get() = pendingEvolutionChoices > 0
     fun bonus(stat: WeaponStat) = bonuses[stat] ?: 0f
     fun scale(stat: WeaponStat) = 1f + bonus(stat)
     fun rank(evolution: RepeaterEvolution) = evolutions[evolution] ?: 0

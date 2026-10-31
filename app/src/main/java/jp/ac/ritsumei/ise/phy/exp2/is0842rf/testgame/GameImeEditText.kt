@@ -2,6 +2,7 @@ package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame
 
 import android.content.Context
 import android.util.AttributeSet
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
@@ -20,7 +21,9 @@ class GameImeEditText @JvmOverloads constructor(
 ) : AppCompatEditText(context, attrs, defStyleAttr) {
     var inputDecoder: ImeTextDecoder = ImeStrokeDecoder()
     var onGameInput: ((ImeStrokeEdit) -> Boolean)? = null
+    var onSpacePressed: (() -> Boolean)? = null
     var traceSink: ((String, CharSequence?) -> Unit)? = null
+    private var lastSpaceDispatchAt = Long.MIN_VALUE
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val connection = super.onCreateInputConnection(outAttrs) ?: return null
@@ -30,6 +33,11 @@ class GameImeEditText @JvmOverloads constructor(
         return object : InputConnectionWrapper(connection, false) {
             override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
                 traceSink?.invoke("setComposingText", text)
+                if (text?.toString() == " ") {
+                    val handled = super.setComposingText("", newCursorPosition)
+                    dispatchSpace()
+                    return handled
+                }
                 val edit = inputDecoder.composing(text?.toString().orEmpty())
                 traceSink?.invoke("decoded", "source=${edit.sourceText};input=${edit.inputText};tokens=${edit.tokens}")
                 if (!edit.accepted) return true
@@ -40,6 +48,11 @@ class GameImeEditText @JvmOverloads constructor(
 
             override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
                 traceSink?.invoke("commitText", text)
+                if (text?.toString() == " ") {
+                    val handled = super.commitText("", newCursorPosition)
+                    dispatchSpace()
+                    return handled
+                }
                 val edit = inputDecoder.commit(text?.toString().orEmpty())
                 traceSink?.invoke("decoded", "source=${edit.sourceText};input=${edit.inputText};tokens=${edit.tokens}")
                 if (!edit.accepted) return true
@@ -74,11 +87,17 @@ class GameImeEditText @JvmOverloads constructor(
                                      textAttribute: TextAttribute?): Boolean =
                 if (start == end) commitText(text, newCursorPosition) else true
             override fun performContextMenuAction(id: Int) = true
-            override fun sendKeyEvent(event: KeyEvent): Boolean =
-                if (isDelete(event.keyCode)) true else {
+            override fun sendKeyEvent(event: KeyEvent): Boolean = when {
+                isDelete(event.keyCode) -> true
+                event.keyCode == KeyEvent.KEYCODE_SPACE -> {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) dispatchSpace()
+                    true
+                }
+                else -> {
                     traceSink?.invoke("sendKeyEvent", "action=${event.action};code=${event.keyCode};unicode=${event.unicodeChar}")
                     super.sendKeyEvent(event)
                 }
+            }
 
             override fun beginBatchEdit(): Boolean {
                 traceSink?.invoke("beginBatchEdit", "")
@@ -100,6 +119,10 @@ class GameImeEditText @JvmOverloads constructor(
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         traceSink?.invoke("onKeyDown", "code=$keyCode;unicode=${event.unicodeChar}")
+        if (keyCode == KeyEvent.KEYCODE_SPACE) {
+            if (event.repeatCount == 0) dispatchSpace()
+            return true
+        }
         if (isDelete(keyCode) || keyCode in listOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
                 KeyEvent.KEYCODE_MOVE_HOME, KeyEvent.KEYCODE_MOVE_END)) return true
         if (keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -114,6 +137,9 @@ class GameImeEditText @JvmOverloads constructor(
         if (event.isCtrlPressed || event.isMetaPressed) return true
         return super.onKeyDown(keyCode, event)
     }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        if (keyCode == KeyEvent.KEYCODE_SPACE) true else super.onKeyUp(keyCode, event)
 
     override fun onTextContextMenuItem(id: Int) = true
 
@@ -130,7 +156,23 @@ class GameImeEditText @JvmOverloads constructor(
         }
     }
 
+    private fun dispatchSpace() {
+        val now = SystemClock.uptimeMillis()
+        if (lastSpaceDispatchAt != Long.MIN_VALUE &&
+            now - lastSpaceDispatchAt < SPACE_EVENT_DEBOUNCE_MS) return
+        lastSpaceDispatchAt = now
+        val edit = inputDecoder.finish()
+        if (edit.tokens.isNotEmpty()) deliver(edit) else inputDecoder.reset()
+        text?.let {
+            BaseInputConnection.removeComposingSpans(it)
+            it.clear()
+        }
+        onSpacePressed?.invoke()
+    }
+
     private fun isDelete(keyCode: Int) =
         keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_FORWARD_DEL
+
+    companion object { private const val SPACE_EVENT_DEBOUNCE_MS = 100L }
 }
 

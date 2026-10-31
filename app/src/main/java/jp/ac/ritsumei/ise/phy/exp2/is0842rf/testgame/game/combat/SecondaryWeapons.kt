@@ -29,6 +29,7 @@ interface SecondaryWeapon {
     val state: WeaponRunState
     fun equip(world: CombatWorld) = Unit
     fun onWord(world: CombatWorld, event: CompletedCombatWord) = Unit
+    fun onMainWeaponFire(world: CombatWorld, projectile: Projectile) = Unit
     fun update(world: CombatWorld, dt: Float) = Unit
     fun activatePickup(world: CombatWorld, pickup: CombatPickup) = Unit
 }
@@ -80,21 +81,21 @@ class DroneActor(state: WeaponRunState, position: Vec2, private val ranged: Bool
     if (guardian) 20f else if (ranged) 10f else 50f, if (ranged) 70f else 5f
 ) {
     private var fireCooldown = 0f
+    private var guardianOrbitAngle = -PI.toFloat() / 4f
     override fun update(world: CombatWorld, dt: Float) {
         beamEnd = null
         if (guardian) {
             remaining = (remaining - dt).coerceAtLeast(0f)
             active = remaining > 0f
+            guardianOrbitAngle += dt * 0.9f * state.scale(WeaponStat.SPEED)
+            position = world.player.position + Vec2(cos(guardianOrbitAngle), sin(guardianOrbitAngle)) * 22f
         } else advanceLifetime(dt)
-        val target = world.nearestEnemy(position)
-        if (!active || target == null) {
-            if (guardian) position += (world.player.position + Vec2(20f, -20f) - position) * min(1f, dt * 2f)
-            return
-        }
+        val target = if (active) world.nearestEnemy(position) else null
+        if (target == null) return
         val delta = target.position - position
         angle = atan2(delta.y, delta.x)
         val stopAt = if (ranged) range * 0.6f else target.radius + 2f
-        if (delta.length() > stopAt)
+        if (ranged && !guardian && delta.length() > stopAt)
             position += delta.normalized() * (if (guardian) 48f else 75f) * state.scale(WeaponStat.SPEED) * dt
         if (ranged) {
             fireCooldown -= dt
@@ -230,10 +231,18 @@ class SentryWeapon : BaseSecondary(WeaponId.SENTRY) {
     override fun equip(world: CombatWorld) { world.addActor(SentryActor(state, world.player.position)) }
 }
 class TeslaMineWeapon : BaseSecondary(WeaponId.TESLA_MINE) {
+    private var deploymentCooldown = 0f
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith("bcde")) world.addActor(FieldActor(state, deployment(world, event),
-            WeaponVisualKind.TESLA, 8f, 12f, 38f, DamageType.ELECTRIC))
+        if (deploymentCooldown <= 0f && event.startsWith("bcde")) {
+            world.addActor(FieldActor(state, deployment(world, event),
+                WeaponVisualKind.TESLA, 32f, 12f, 38f, DamageType.ELECTRIC))
+            deploymentCooldown = DEPLOYMENT_COOLDOWN_SECONDS
+        }
     }
+    override fun update(world: CombatWorld, dt: Float) {
+        deploymentCooldown = (deploymentCooldown - dt).coerceAtLeast(0f)
+    }
+    companion object { private const val DEPLOYMENT_COOLDOWN_SECONDS = 5f }
 }
 class OscillatorWeapon : BaseSecondary(WeaponId.OSCILLATOR) {
     private var direction = Vec2(0f, -1f)
@@ -268,9 +277,9 @@ class MeteorWeapon : BaseSecondary(WeaponId.METEOR) {
     }
 }
 class ChopperWeapon : BaseSecondary(WeaponId.CHOPPER) {
-    override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
+    override fun onMainWeaponFire(world: CombatWorld, projectile: Projectile) {
         world.addActor(MovingBladeActor(state, world.player.position,
-            (event.position - world.player.position).normalized() * 150f))
+            projectile.velocity.normalized() * 150f))
     }
 }
 class MinefieldWeapon : BaseSecondary(WeaponId.MINEFIELD) {

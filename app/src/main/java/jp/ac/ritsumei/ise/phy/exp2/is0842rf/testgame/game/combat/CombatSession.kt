@@ -44,7 +44,9 @@ class CombatSession(
     val completions: List<CompletedCaption> get() = mutableCompletions
     val pickupCaptions: List<PickupCaption> get() = mutablePickupCaptions
     var upgradeSelection: UpgradeSelection? = null; private set
-    var rerollsRemaining = 4; private set
+    var rerollsRemaining = 3; private set
+    val pendingEvolutionChoices get() = (world.mainWeapon as? Repeater)?.upgrades?.pendingEvolutionChoices ?: 0
+    val pendingChoiceCount get() = world.pendingLevelUps + pendingEvolutionChoices
     val canRerollUpgrades get() = upgradeSelection?.let { selection ->
         rerollsRemaining > 0 && !selection.isChoosing && (!selection.evolution ||
             ((world.mainWeapon as? Repeater)?.upgrades?.let { state ->
@@ -78,7 +80,6 @@ class CombatSession(
                 check(world.applyUpgrade(offer)) { "An offered upgrade must still be applicable." }
                 upgradeSelection = null
                 inputEpoch++
-                openPendingReward()
             }
             return
         }
@@ -93,19 +94,30 @@ class CombatSession(
         mutableCaptions.removeAll { (it.fadeAge ?: 0f) >= CombatWorld.DEATH_FADE_SECONDS }
         mutableCompletions.forEach { it.age += dt }
         mutableCompletions.removeAll { it.progress >= 1f }
-        openPendingReward()
     }
 
-    private fun openPendingReward() {
-        if (world.isGameOver || upgradeSelection != null) return
-        val evolution = (world.mainWeapon as? Repeater)?.upgrades?.canEvolve == true
-        if (!evolution && !world.consumeLevelUp()) return
-        showReward(evolution)
+    /** Space opens one queued reward, or rerolls while a choice is already open. */
+    fun handleSpace(): Boolean {
+        if (world.isGameOver) return false
+        if (upgradeSelection != null) {
+            rerollUpgrades()
+            return true
+        }
+        if (pendingChoiceCount == 0) return false
+
+        val evolution = pendingEvolutionChoices > 0
+        val selection = createReward(evolution) ?: return false
+        if (!evolution && !world.consumeLevelUp()) return false
+        upgradeSelection = selection
+        pendingTokens = emptyList()
+        refreshStates()
+        inputEpoch++
+        return true
     }
 
-    private fun showReward(evolution: Boolean) {
+    private fun createReward(evolution: Boolean): UpgradeSelection? {
         val offers = UpgradeCatalog.roll(world, random, evolution)
-        if (offers.isEmpty()) return
+        if (offers.isEmpty()) return null
         val words = mutableListOf<WordDefinition>()
         playableDefinitions.filter { it.readingLength == 3 }.shuffled(random).forEach { candidate ->
             if (words.size < offers.size && words.none {
@@ -120,17 +132,18 @@ class CombatSession(
         val fallback = listOf(WordDefinition("u-light", "ひかり", "光"),
             WordDefinition("u-bond", "きずな", "絆"), WordDefinition("u-wing", "つばさ", "翼"))
         val selectedWords = if (words.size == offers.size) words else fallback.take(offers.size)
-        upgradeSelection = UpgradeSelection(offers, selectedWords, evolution, world.level, engine.inputMode)
-        pendingTokens = emptyList()
-        refreshStates()
-        inputEpoch++
+        return UpgradeSelection(offers, selectedWords, evolution, world.level, engine.inputMode)
     }
 
     fun rerollUpgrades(): Boolean {
         val selection = upgradeSelection ?: return false
         if (!canRerollUpgrades) return false
+        val rerolled = createReward(selection.evolution) ?: return false
         rerollsRemaining--
-        showReward(selection.evolution)
+        upgradeSelection = rerolled
+        pendingTokens = emptyList()
+        refreshStates()
+        inputEpoch++
         return true
     }
 

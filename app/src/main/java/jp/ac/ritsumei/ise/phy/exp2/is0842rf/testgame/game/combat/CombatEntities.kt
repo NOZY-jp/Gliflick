@@ -184,7 +184,7 @@ data class RepeaterDefinition(val burstCount: Int = 3, val shotInterval: Float =
 }
 
 sealed interface WeaponAction {
-    data class LaunchProjectile(val projectile: Projectile) : WeaponAction
+    data class LaunchProjectile(val projectile: Projectile, val startsMainWeaponFire: Boolean = true) : WeaponAction
 }
 
 /** Shared runtime modifiers let each weapon decide how its own firing pattern responds. */
@@ -263,7 +263,7 @@ class Repeater(val definition: RepeaterDefinition = RepeaterDefinition(),
                 explosionRadius = if (explosion > 0) (if (explosion == 1) 15f else 20f) * upgrades.scale(WeaponStat.RANGE) else 0f,
                 ricochets = when (upgrades.rank(RepeaterEvolution.RICOCHET)) { 1 -> 3; 2 -> 5; else -> 0 },
                 freezeChance = if (frost > 0) 0.03f else 0f
-            ))
+            ), startsMainWeaponFire = shotIndex == 0)
             burst.remaining--
             if (burst.remaining == 0) bursts.removeFirst()
             val interval = if (burst.remaining == 0) definition.burstInterval else definition.shotInterval

@@ -22,7 +22,14 @@ class WeaponIconRenderer(private val context: Context) {
 
     fun draw(canvas: Canvas, id: WeaponId, x: Float, y: Float, radius: Float, color: Int,
              evolution: RepeaterEvolution? = null) {
-        val resource = resourceFor(id, evolution)
+        drawResource(canvas, resourceFor(id, evolution), x, y, radius, color)
+    }
+
+    fun drawTeslaMineActor(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
+        drawResource(canvas, R.raw.weapon_actor_tesla_mine, x, y, radius, color)
+    }
+
+    private fun drawResource(canvas: Canvas, resource: Int, x: Float, y: Float, radius: Float, color: Int) {
         val icon = icons.getOrPut(resource) { load(resource) }
         canvas.save()
         canvas.translate(x, y)
@@ -62,6 +69,7 @@ class WeaponIconRenderer(private val context: Context) {
         var width = 1000f
         var height = 1000f
         var pathData: String? = null
+        var fillRule: String? = null
         context.resources.openRawResource(resource).use { input ->
             parser.setInput(input, "UTF-8")
             while (parser.next() != XmlPullParser.END_DOCUMENT) {
@@ -75,13 +83,17 @@ class WeaponIconRenderer(private val context: Context) {
                         }
                         left = bounds[0]; top = bounds[1]; width = bounds[2]; height = bounds[3]
                     }
-                    "path" -> if (pathData == null) pathData = parser.getAttributeValue(null, "d")
+                    "path" -> if (pathData == null) {
+                        pathData = parser.getAttributeValue(null, "d")
+                        fillRule = parser.getAttributeValue(null, "fill-rule")
+                    }
                 }
             }
         }
         val path = PathParser.createPathFromPathData(requireNotNull(pathData) {
             "The weapon SVG needs a path element."
         }) ?: error("Could not parse weapon SVG path.")
+        if (fillRule == "evenodd") path.fillType = Path.FillType.EVEN_ODD
         return SvgIcon(path, left, top, width, height)
     }
 }

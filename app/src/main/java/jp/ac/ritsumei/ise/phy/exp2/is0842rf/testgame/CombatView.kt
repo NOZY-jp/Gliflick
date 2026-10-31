@@ -58,7 +58,8 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
                 }.joinToString("、") + "、リロール残り" + session.rerollsRemaining
             else
             contentDescription = "リピーター レベル${session.world.level} HP${session.world.player.hp} " +
-                session.captions.filter { !it.retired }.joinToString("、") { it.state.inputText }
+                session.captions.filter { !it.retired }.joinToString("、") { it.state.inputText } +
+                if (session.pendingChoiceCount > 0) "、強化選択 Space、残り${session.pendingChoiceCount}回" else ""
         }
         invalidate()
         Choreographer.getInstance().postFrameCallback(this)
@@ -103,6 +104,15 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
         }
         onInputRequested?.invoke()
         return true
+    }
+
+    fun handleSpaceKey(): Boolean {
+        val handled = session.handleSpace()
+        if (handled) {
+            syncInputBoundary()
+            invalidate()
+        }
+        return handled
     }
 
     override fun onDetachedFromWindow() { stop(); super.onDetachedFromWindow() }

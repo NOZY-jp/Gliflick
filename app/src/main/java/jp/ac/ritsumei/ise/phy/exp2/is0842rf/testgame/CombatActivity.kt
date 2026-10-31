@@ -38,6 +38,7 @@ class CombatActivity : AppCompatActivity() {
                 EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             onGameInput = { edit -> arena.session.onInput(edit.tokens, edit.composing) }
+            onSpacePressed = arena::handleSpaceKey
         }
         root.addView(editor, FrameLayout.LayoutParams(1, 1, Gravity.TOP or Gravity.START))
         setContentView(root)

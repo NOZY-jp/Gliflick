@@ -39,3 +39,7 @@
 | EXPLODING_BULLETS | `app/src/main/res/raw/evolution_icon_exploding_bullets.svg` | U+EC3B |
 
 アプリは`WeaponIconRenderer`でSVGのviewBoxとパスを読み、Canvasへ描画する。パスを更新すると、ビルド後のすべての表示箇所へ反映される。ファイル名、viewBox、path要素を保ち、パス形状は自由に編集できる。
+
+## ゲーム中の設置体
+
+カード用の公式字形とは別に、ゲーム内Tesla Mineの設置体は細い三角形アウトラインで表示する。編集対象は`app/src/main/res/raw/weapon_actor_tesla_mine.svg`。この図形はゲーム内アクター用で、公式WikiのTesla Mineアイコンは引き続きカードと装備枠に使う。

@@ -283,7 +283,11 @@ class CombatWorld(
             mutableEnemies.firstOrNull { it.id == id && it.isAlive }?.position
         }, weaponModifiers)
         actions.forEach { action -> when (action) {
-            is WeaponAction.LaunchProjectile -> launch(action.projectile)
+            is WeaponAction.LaunchProjectile -> {
+                if (action.startsMainWeaponFire)
+                    mutableSecondaryWeapons.forEach { it.onMainWeaponFire(this, action.projectile) }
+                launch(action.projectile)
+            }
         } }
         val spent = mutableSetOf<Projectile>()
         mutableProjectiles.forEach { projectile ->
