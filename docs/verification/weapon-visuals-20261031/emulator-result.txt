@@ -1,0 +1,23 @@
+INSTRUMENTATION_STATUS: class=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.WeaponVisualInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.WeaponVisualInstrumentedTest:
+INSTRUMENTATION_STATUS: test=allElevenCombatAppearancesRenderAndSpectreMoves
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.WeaponVisualInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=allElevenCombatAppearancesRenderAndSpectreMoves
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 53.156
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1

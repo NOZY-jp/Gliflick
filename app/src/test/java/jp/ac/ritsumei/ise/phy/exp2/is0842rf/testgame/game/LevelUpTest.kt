@@ -20,6 +20,9 @@ class LevelUpTest {
         val enemy = session.world.spawnEnemy(Vec2(200f, 60f))
         session.world.grantExperience(200)
         session.update(0f)
+        assertNull(session.upgradeSelection)
+        assertEquals(2, session.pendingChoiceCount)
+        assertTrue(session.handleSpace())
         val elapsed = session.world.elapsedSeconds
         val position = enemy.position
         repeat(120) { session.update(1f / 120f) }
@@ -28,7 +31,9 @@ class LevelUpTest {
         assertEquals(1, session.world.pendingLevelUps)
         session.tapUpgrade(0)
         finish(session)
-        assertNotNull(session.upgradeSelection)
+        assertNull(session.upgradeSelection)
+        assertEquals(1, session.pendingChoiceCount)
+        assertTrue(session.handleSpace())
         session.tapUpgrade(0)
         finish(session)
         assertNull(session.upgradeSelection)
@@ -39,6 +44,7 @@ class LevelUpTest {
         val session = session()
         session.world.grantExperience(50)
         session.update(0f)
+        assertTrue(session.handleSpace())
         val selection = session.upgradeSelection!!
         val reading = selection.words[1].text
         assertFalse(session.onInput(splitTextCharacters(reading.take(1)).map { InputToken.Stroke(it) }, true))
@@ -51,7 +57,8 @@ class LevelUpTest {
     @Test fun rerollsAreFiniteAndDoNotAdvanceGameTime() {
         val session = session()
         session.world.grantExperience(50); session.update(0f)
-        repeat(4) { assertTrue(session.rerollUpgrades()) }
+        assertTrue(session.handleSpace())
+        repeat(3) { assertTrue(session.rerollUpgrades()) }
         assertFalse(session.rerollUpgrades())
         assertEquals(0, session.rerollsRemaining)
         assertEquals(0.0, session.world.elapsedSeconds, 0.0)
@@ -100,7 +107,7 @@ class LevelUpTest {
     @Test fun guardianStopsWithoutFuelAndRestartsAfterTypedPickup() {
         val world = world()
         world.acquireWeapon(WeaponId.GUARDIAN)
-        val drone = world.weaponActors.single() as DroneActor
+        val drone = world.weaponActors.single() as GuardianActor
         drone.remaining = 0f
         world.update(0.01f)
         assertFalse(drone.active)
@@ -116,6 +123,7 @@ class LevelUpTest {
         val repeater = session.world.mainWeapon as Repeater
         repeater.upgrades.creditKills(50)
         session.update(0f)
+        assertTrue(session.handleSpace())
         assertTrue(session.upgradeSelection!!.evolution)
         val offer = session.upgradeSelection!!.offers[0]
         session.tapUpgrade(0); finish(session)
@@ -174,10 +182,11 @@ class LevelUpTest {
         RepeaterEvolution.entries.drop(1).forEach { state.evolve(it); state.evolve(it) }
         state.creditKills(1000)
         session.update(0f)
+        assertTrue(session.handleSpace())
         assertEquals(1, session.upgradeSelection!!.offers.size)
         assertFalse(session.canRerollUpgrades)
         assertFalse(session.rerollUpgrades())
-        assertEquals(4, session.rerollsRemaining)
+        assertEquals(3, session.rerollsRemaining)
     }
 
     @Test fun kanaAndRomanInputUseTheSameDictionaryGlyphWeaponCondition() {

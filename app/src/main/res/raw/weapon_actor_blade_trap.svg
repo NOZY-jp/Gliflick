@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Four long rectangular spokes with narrow tips and a hollow centre. -->
+  <path fill="#75756E" fill-rule="evenodd" d="M58 50 A8 8 0 1 1 42 50 A8 8 0 1 1 58 50 Z M54 50 A4 4 0 1 1 46 50 A4 4 0 1 1 54 50 Z M59 48 H89 L98 50 L89 52 H59 Z M48 59 H52 V89 L50 98 L48 89 Z M41 48 V52 H11 L2 50 L11 48 Z M48 41 V11 L50 2 L52 11 V41 Z"/>
+</svg>

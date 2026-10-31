@@ -277,7 +277,7 @@ class CombatWorld(
             }
         }
         mutableSecondaryWeapons.forEach { it.update(this, dt) }
-        mutableActors.toList().forEach { it.update(this, dt) }
+        mutableActors.toList().forEach { it.update(this, dt); it.captureMotion(dt) }
         mutableActors.removeAll { it.finished }
         val actions = mainWeapon.update(dt, player.position, { id ->
             mutableEnemies.firstOrNull { it.id == id && it.isAlive }?.position

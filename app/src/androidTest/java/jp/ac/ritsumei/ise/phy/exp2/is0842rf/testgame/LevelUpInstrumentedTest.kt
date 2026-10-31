@@ -29,6 +29,8 @@ class LevelUpInstrumentedTest {
         instrumentation.runOnMainSync {
             val arena = activity.findViewById<CombatView>(R.id.combatArena)
             arena.session.world.grantExperience(arena.session.world.nextLevelExperience)
+            activity.findViewById<GameImeEditText>(R.id.combatInputHost)
+                .onCreateInputConnection(EditorInfo())!!.commitText(" ", 1)
         }
         waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection != null }
         SystemClock.sleep(220)
@@ -67,7 +69,7 @@ class LevelUpInstrumentedTest {
         try {
             reward(activity)
             tapBox(activity, reroll = true)
-            waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.rerollsRemaining == 3 }
+            waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.rerollsRemaining == 2 }
             instrumentation.runOnMainSync {
                 val arena = activity.findViewById<CombatView>(R.id.combatArena)
                 val selection = arena.session.upgradeSelection!!
@@ -101,7 +103,7 @@ class LevelUpInstrumentedTest {
             instrumentation.runOnMainSync {
                 val world = activity.findViewById<CombatView>(R.id.combatArena).session.world
                 listOf(WeaponId.SENTRY, WeaponId.HUNTER, WeaponId.GUARDIAN, WeaponId.ORBITER).forEach { world.acquireWeapon(it) }
-                val enemy = world.spawnEnemy(world.player.position + Vec2(80f, -60f),
+                val enemy = world.spawnEnemy(world.player.position + Vec2(50f, -30f),
                     EnemyDefinition(maxHp = 10000, speed = 0f))
                 world.spawnEnemy(world.player.position + Vec2(-75f, 60f), EnemyDefinition(maxHp = 10000, speed = 0f))
                 world.completeWord(WordDefinition("north", "north", languageTag = "en"), enemy.id)
@@ -124,6 +126,7 @@ class LevelUpInstrumentedTest {
             instrumentation.runOnMainSync {
                 val world = activity.findViewById<CombatView>(R.id.combatArena).session.world
                 (world.mainWeapon as Repeater).upgrades.creditKills(50)
+                activity.findViewById<CombatView>(R.id.combatArena).handleSpaceKey()
             }
             waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection?.evolution == true }
             capture(activity, "evolution-phone.png")

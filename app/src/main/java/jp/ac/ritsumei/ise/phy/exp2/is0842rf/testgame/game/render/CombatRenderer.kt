@@ -78,6 +78,7 @@ class CombatRenderer(context: Context) {
         }
         world.hitFeedback.forEach { drawHitGeometry(canvas, it) }
         world.projectiles.forEach { bullet ->
+            if (secondaryRenderer.drawProjectile(canvas, bullet)) return@forEach
             val tail = bullet.position - bullet.velocity.normalized() * min(30f, bullet.age * bullet.velocity.length())
             if ((bullet.position - tail).length() > 0.001f) {
                 paint.shader = LinearGradient(tail.x, tail.y, bullet.position.x, bullet.position.y,

@@ -6,7 +6,7 @@
 
 [Glyphica公式Wiki](https://alias.black/glyphica/wiki_english.html)の各武器見出しは `Title-Icons-Glyphica.ttf` の字形を、Repeater進化一覧は `Evolution-Icons-Glyphica.ttf` の字形を使っている。Wikiに表示されるコードポイントの輪郭をSVGの`path`へ変換した。アプリへはフォントを埋め込まず、編集できるSVGをそのまま`res/raw`から読み込む。
 
-武器アイコンはWikiのアクセント色で保存。字形の外形自体が色面となり、内部の線や切り欠きは透明になる公式の表示方式に合わせた。レベルアップカード、戦闘中の設置物、下部の装備枠で同じSVGを使い、描画時だけコンテキストに合わせて色を変える。
+武器アイコンはWikiのアクセント色で保存。字形の外形自体が色面となり、内部の線や切り欠きは透明になる公式の表示方式に合わせた。レベルアップカードと下部の装備枠で同じSVGを使い、描画時だけコンテキストに合わせて色を変える。ゲーム中の攻撃体には専用の図形と動的な軌跡を使う。
 
 ## 武器アイコン
 
@@ -42,4 +42,4 @@
 
 ## ゲーム中の設置体
 
-カード用の公式字形とは別に、ゲーム内Tesla Mineの設置体は細い三角形アウトラインで表示する。編集対象は`app/src/main/res/raw/weapon_actor_tesla_mine.svg`。この図形はゲーム内アクター用で、公式WikiのTesla Mineアイコンは引き続きカードと装備枠に使う。
+全11種に`app/src/main/res/raw/weapon_actor_*.svg`を用意する。これはカード用フォントの字形ではなく、公式のゲーム画像・映像と公開デモの描画から再構成した形である。Spectreの軌跡、Hunterの電撃、Guardianの火球、Orbiterの残像など動く部分は履歴・位相をCanvasへ渡して描く。武器別のファイル対応、形の根拠、編集方法は[武器アクターの外観](WeaponActorAppearance.md)にまとめる。

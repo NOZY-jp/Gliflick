@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Two opposed long blades, not Blade Trap's four spokes. -->
+  <path fill="#75756E" d="M50 50 L45 50 L45 10 L50 0 Z M50 50 L55 50 L55 90 L50 100 Z M53 50 A3 3 0 1 1 47 50 A3 3 0 1 1 53 50 Z"/>
+</svg>

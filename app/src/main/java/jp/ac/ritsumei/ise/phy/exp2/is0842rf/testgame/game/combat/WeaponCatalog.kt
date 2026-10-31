@@ -16,7 +16,7 @@ enum class WeaponId(val title: String, val tags: String, val description: String
     MINEFIELD("マインフィールド", "爆発 / ドローン", "f・g・h・i で始まる語で接触爆発する地雷を展開。"),
     BLADE_TRAP("ブレードトラップ", "キネティック / タレット", "j・k・l・m で始まる語で四枚刃の回転トラップを設置。"),
     ORBITER("オービター", "ケミカル / リモート", "n・o・p・q で始まる語で、自機を周回するオーブを展開。"),
-    GUARDIAN("ガーディアン", "熱 / ドローン", "レーザードローンを常設。燃料の語を打って活動時間を補給。")
+    GUARDIAN("ガーディアン", "熱 / ドローン", "火球を回す護衛ドローンを常設。燃料の語を打って活動時間を補給。")
 }
 
 enum class WeaponStat(val title: String) {

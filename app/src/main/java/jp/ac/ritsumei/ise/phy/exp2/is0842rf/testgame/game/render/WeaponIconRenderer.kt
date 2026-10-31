@@ -12,7 +12,7 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.WeaponId
 import org.xmlpull.v1.XmlPullParser
 import kotlin.math.max
 
-/** Draws editable SVG paths based on Glyphica's official wiki icon fonts. */
+/** Draws editable interface glyphs and the independently referenced combat silhouettes. */
 class WeaponIconRenderer(private val context: Context) {
     private data class SvgIcon(val path: Path, val left: Float, val top: Float,
                                val width: Float, val height: Float)
@@ -25,8 +25,44 @@ class WeaponIconRenderer(private val context: Context) {
         drawResource(canvas, resourceFor(id, evolution), x, y, radius, color)
     }
 
-    fun drawTeslaMineActor(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
-        drawResource(canvas, R.raw.weapon_actor_tesla_mine, x, y, radius, color)
+    fun drawActor(canvas: Canvas, id: WeaponId, x: Float, y: Float, radius: Float, color: Int) {
+        drawResource(canvas, actorResource(id), x, y, radius, color)
+    }
+
+    fun drawFuel(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
+        drawResource(canvas, R.raw.weapon_pickup_fuel, x, y, radius, color)
+    }
+
+    fun drawSpectreSegment(canvas: Canvas, ax: Float, ay: Float, bx: Float, by: Float,
+                           thickness: Float, color: Int) {
+        val icon = icons.getOrPut(R.raw.weapon_actor_spectre) { load(R.raw.weapon_actor_spectre) }
+        val dx = bx - ax; val dy = by - ay
+        val length = kotlin.math.sqrt(dx * dx + dy * dy)
+        if (length < 0.001f) return
+        canvas.save()
+        canvas.translate(ax, ay)
+        canvas.rotate(kotlin.math.atan2(dy, dx) * 180f / kotlin.math.PI.toFloat())
+        canvas.scale(length / icon.width, thickness / icon.height)
+        canvas.translate(-icon.left, -(icon.top + icon.height / 2f))
+        paint.color = color
+        canvas.drawPath(icon.path, paint)
+        canvas.restore()
+    }
+
+    // Combat geometry is deliberately exhaustive: a new weapon cannot fall back to its card icon.
+    private fun actorResource(id: WeaponId): Int = when (id) {
+        WeaponId.REPEATER -> error("Repeater is drawn as the player and its projectiles.")
+        WeaponId.SPECTRE -> R.raw.weapon_actor_spectre
+        WeaponId.SENTRY -> R.raw.weapon_actor_sentry
+        WeaponId.TESLA_MINE -> R.raw.weapon_actor_tesla_mine
+        WeaponId.OSCILLATOR -> R.raw.weapon_actor_oscillator
+        WeaponId.METEOR -> R.raw.weapon_actor_meteor
+        WeaponId.HUNTER -> R.raw.weapon_actor_hunter
+        WeaponId.CHOPPER -> R.raw.weapon_actor_chopper
+        WeaponId.MINEFIELD -> R.raw.weapon_actor_minefield
+        WeaponId.BLADE_TRAP -> R.raw.weapon_actor_blade_trap
+        WeaponId.ORBITER -> R.raw.weapon_actor_orbiter
+        WeaponId.GUARDIAN -> R.raw.weapon_actor_guardian
     }
 
     private fun drawResource(canvas: Canvas, resource: Int, x: Float, y: Float, radius: Float, color: Int) {

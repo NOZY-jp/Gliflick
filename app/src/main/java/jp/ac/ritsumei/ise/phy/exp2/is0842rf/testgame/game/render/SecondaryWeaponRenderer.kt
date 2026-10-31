@@ -5,97 +5,109 @@ import android.graphics.*
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.*
 import kotlin.math.*
 
+/** Combat silhouettes follow the public gameplay/demo, independently of the square equipment icons. */
 class SecondaryWeaponRenderer(context: Context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val icons = WeaponIconRenderer(context)
     private val ink = Color.rgb(117, 117, 110)
-    private fun color(type: DamageType): Int = when (type) {
-        DamageType.HEAT -> Color.rgb(158, 91, 96)
-        DamageType.ELECTRIC -> Color.rgb(116, 117, 139)
-        DamageType.CHEMICAL -> Color.rgb(125, 137, 115)
-        DamageType.EXPLOSIVE -> Color.rgb(158, 124, 104)
-        DamageType.COLD -> Color.rgb(122, 143, 151)
-        else -> ink
+    private fun ink(alpha: Int) = Color.argb(alpha.coerceIn(0, 255), 117, 117, 110)
+    private fun stroke(alpha: Int, width: Float = 0.7f) {
+        paint.shader = null; paint.pathEffect = null
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = width
+        paint.strokeCap = Paint.Cap.BUTT; paint.color = ink(alpha)
     }
+    private fun circle(canvas: Canvas, p: Vec2, radius: Float, alpha: Int, width: Float = 0.7f) {
+        stroke(alpha, width); canvas.drawCircle(p.x, p.y, radius, paint)
+    }
+    private fun actor(canvas: Canvas, id: WeaponId, p: Vec2, radius: Float, angle: Float = 0f, alpha: Int = 190) {
+        canvas.save()
+        canvas.rotate(angle * 180f / PI.toFloat(), p.x, p.y)
+        icons.drawActor(canvas, id, p.x, p.y, radius, ink(alpha))
+        canvas.restore()
+    }
+
     fun draw(canvas: Canvas, world: CombatWorld) {
-        if (world.weaponActors.any { it.visual == WeaponVisualKind.GUARDIAN }) {
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 0.55f
-            paint.color = ink
-            paint.alpha = 55
-            canvas.drawCircle(world.player.position.x, world.player.position.y, 22f, paint)
-        }
-        world.weaponActors.forEach { actor ->
-            val p = actor.position
-            paint.color = color(actor.type); paint.alpha = if (actor.active) 155 else 45
-            paint.strokeWidth = 0.85f; paint.style = Paint.Style.STROKE
-            when (actor.visual) {
-                WeaponVisualKind.TESLA -> {
-                    paint.alpha = 38
-                    canvas.drawCircle(p.x, p.y, actor.range, paint)
-                    icons.drawTeslaMineActor(canvas, p.x, p.y, 6f,
-                        Color.argb(if (actor.active) 190 else 55, Color.red(color(actor.type)),
-                            Color.green(color(actor.type)), Color.blue(color(actor.type))))
-                }
-                WeaponVisualKind.BOMBARDMENT -> {
-                    paint.alpha = 70
-                    canvas.drawCircle(p.x, p.y, actor.range, paint)
-                    canvas.drawLine(p.x - actor.range, p.y, p.x + actor.range, p.y, paint)
-                    canvas.drawLine(p.x, p.y - actor.range, p.x, p.y + actor.range, paint)
-                    paint.alpha = 170
-                    repeat(5) { i ->
-                        val a = actor.angle * 1.5f + i * 2f * PI.toFloat() / 5f
-                        val r = actor.range * (0.25f + (sin(actor.angle * 2 + i) + 1f) * 0.25f)
-                        val x = p.x + cos(a) * r; val y = p.y + sin(a) * r
-                        canvas.drawLine(x - 3f, y - 12f, x, y, paint)
+        world.weaponActors.forEach { body ->
+            val p = body.position
+            when (body.source) {
+                WeaponId.SPECTRE -> {
+                    val points = body.trail + p
+                    for (i in 1 until points.size) {
+                        val a = points[i - 1]; val b = points[i]
+                        icons.drawSpectreSegment(canvas, a.x, a.y, b.x, b.y, 1.5f,
+                            ink(210 * i / points.size))
                     }
                 }
-                WeaponVisualKind.BLADE -> {
-                    canvas.save()
-                    canvas.rotate(actor.angle * 180f / PI.toFloat(), p.x, p.y)
-                    repeat(4) {
-                        canvas.rotate(90f, p.x, p.y)
-                        val path = Path()
-                        path.moveTo(p.x, p.y - 2f); path.lineTo(p.x + actor.range * 0.3f, p.y - actor.range)
-                        path.lineTo(p.x - actor.range * 0.1f, p.y - actor.range * 0.85f); path.close()
-                        canvas.drawPath(path, paint)
+                WeaponId.HUNTER -> actor(canvas, body.source, p, 5f, body.angle)
+                WeaponId.SENTRY -> {
+                    val muzzle = p + Vec2(cos(body.angle), sin(body.angle)) * (world.player.radius + 2f)
+                    actor(canvas, body.source, muzzle, 2.5f, body.angle)
+                }
+                WeaponId.TESLA_MINE -> {
+                    circle(canvas, p, body.range, 48)
+                    actor(canvas, body.source, p, 4.5f, body.angle)
+                }
+                WeaponId.CHOPPER -> {
+                    paint.style = Paint.Style.FILL; paint.color = ink(22)
+                    val bounds = RectF(p.x - body.range, p.y - body.range, p.x + body.range, p.y + body.range)
+                    val degrees = body.angle * 180f / PI.toFloat()
+                    canvas.drawArc(bounds, degrees + 90f, 40f, true, paint)
+                    canvas.drawArc(bounds, degrees + 270f, 40f, true, paint)
+                    actor(canvas, body.source, p, body.range, body.angle)
+                }
+                WeaponId.BLADE_TRAP -> actor(canvas, body.source, p, body.range, body.angle)
+                WeaponId.MINEFIELD -> {
+                    circle(canvas, p, body.range * 0.5f, 48)
+                    actor(canvas, body.source, p, 4f, body.angle)
+                }
+                WeaponId.ORBITER -> {
+                    val direction = (p - world.player.position).normalized()
+                    val length = (p - world.player.position).length() - body.range
+                    stroke(30, 0.6f)
+                    var distance = 8f
+                    while (distance < length) {
+                        val a = world.player.position + direction * distance
+                        val b = world.player.position + direction * min(distance + 3f, length)
+                        canvas.drawLine(a.x, a.y, b.x, b.y, paint)
+                        distance += 8f
                     }
-                    canvas.restore()
-                    canvas.drawCircle(p.x, p.y, 2f, paint)
+                    val trail = body.trail
+                    trail.forEachIndexed { i, point ->
+                        val fraction = (i + 1f) / (trail.size + 1f)
+                        actor(canvas, body.source, point, body.range * fraction, alpha = (42 * fraction).toInt())
+                    }
+                    actor(canvas, body.source, p, body.range, alpha = 80)
                 }
-                WeaponVisualKind.ORB -> {
-                    paint.style = Paint.Style.FILL
-                    canvas.drawCircle(p.x, p.y, 4.5f, paint)
-                    paint.style = Paint.Style.STROKE
-                    canvas.drawCircle(p.x, p.y, 6f, paint)
-                }
-                else -> {
-                    canvas.save()
-                    canvas.rotate(actor.angle * 180f / PI.toFloat() + 90f, p.x, p.y)
-                    icons.draw(canvas, actor.source, p.x, p.y,
-                        if (actor.visual == WeaponVisualKind.SENTRY) 7.5f else 5.5f,
-                        Color.argb(if (actor.active) 180 else 55, Color.red(color(actor.type)),
-                            Color.green(color(actor.type)), Color.blue(color(actor.type))))
-                    canvas.restore()
-                }
+                WeaponId.GUARDIAN -> drawGuardian(canvas, body as GuardianActor, world)
+                WeaponId.METEOR -> actor(canvas, body.source, p, 8f, body.age * 0.6f, 125)
+                WeaponId.REPEATER, WeaponId.OSCILLATOR -> Unit
             }
         }
         world.weaponEffects.forEach { effect ->
-            paint.color = color(effect.type)
-            paint.alpha = (150 * effect.alpha).toInt()
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = if (effect.type == DamageType.ELECTRIC) 1.2f else 0.9f
-            if (effect.radius > 0f) {
-                val radius = effect.radius * (1f - effect.alpha * 0.25f)
-                canvas.drawCircle(effect.start.x, effect.start.y, radius, paint)
-            } else canvas.drawLine(effect.start.x, effect.start.y, effect.end.x, effect.end.y, paint)
+            if (effect.radius == 0f) {
+                if (effect.type == DamageType.ELECTRIC) drawLightning(canvas, effect)
+                else {
+                    stroke((170 * effect.alpha).toInt())
+                    canvas.drawLine(effect.start.x, effect.start.y, effect.end.x, effect.end.y, paint)
+                }
+            } else {
+                val progress = 1f - effect.alpha
+                if (effect.source == WeaponId.METEOR) {
+                    stroke((65 * effect.alpha).toInt(), 1.1f)
+                    canvas.drawLine(effect.start.x + world.height, effect.start.y - world.height,
+                        effect.start.x, effect.start.y, paint)
+                    paint.style = Paint.Style.FILL; paint.color = ink((28 * effect.alpha).toInt())
+                    canvas.drawCircle(effect.start.x, effect.start.y, effect.radius * progress, paint)
+                }
+                circle(canvas, effect.start, effect.radius * (0.65f + progress * 0.45f),
+                    (100 * effect.alpha).toInt(), 1.2f * effect.alpha + 0.2f)
+            }
         }
         world.pickups.forEach { pickup ->
             val p = pickup.position
-            icons.draw(canvas, if (pickup.kind == PickupKind.METEOR) WeaponId.METEOR else WeaponId.GUARDIAN,
-                p.x, p.y, 9f, Color.rgb(158, 91, 96))
-            paint.style = Paint.Style.FILL
-            paint.color = Color.rgb(199, 199, 188)
+            if (pickup.kind == PickupKind.METEOR) actor(canvas, WeaponId.METEOR, p, 8f, pickup.age * 0.6f)
+            else icons.drawFuel(canvas, p.x, p.y, 7f, ink(190))
+            paint.style = Paint.Style.FILL; paint.color = Color.rgb(199, 199, 188)
             canvas.drawRect(p.x - 10f, p.y + 13f, p.x + 10f, p.y + 14.5f, paint)
             paint.color = ink
             canvas.drawRect(p.x - 10f, p.y + 13f, p.x - 10f + 20f * pickup.remainingFraction, p.y + 14.5f, paint)
@@ -104,6 +116,68 @@ class SecondaryWeaponRenderer(context: Context) {
             canvas.drawText(pickup.kind.title, p.x, p.y + 25f, paint)
         }
         paint.alpha = 255; paint.style = Paint.Style.FILL
+    }
+
+    private fun drawGuardian(canvas: Canvas, body: GuardianActor, world: CombatWorld) {
+        val p = body.position
+        circle(canvas, world.player.position, body.range, 40)
+        stroke(if (body.active) 70 else 30, 0.55f)
+        paint.pathEffect = DashPathEffect(floatArrayOf(2f, 2f), body.age * 2f)
+        canvas.drawCircle(p.x, p.y, body.orbitRadius, paint)
+        paint.pathEffect = null
+        if (body.active) for (phase in listOf(0f, PI.toFloat())) {
+            for (i in 6 downTo 0) {
+                val point = body.fireballPosition(phase, i * 0.13f)
+                circle(canvas, point, body.fireballRadius * (1f - i * 0.095f),
+                    175 - i * 17, 0.9f)
+            }
+        }
+        actor(canvas, body.source, p, body.bodyRadius, body.angle, if (body.active) 210 else 75)
+        if (!body.active) {
+            stroke(150, 0.6f)
+            canvas.drawLine(p.x - 1f, p.y - 1f, p.x + 1f, p.y + 1f, paint)
+            canvas.drawLine(p.x + 1f, p.y - 1f, p.x - 1f, p.y + 1f, paint)
+        }
+        paint.style = Paint.Style.FILL; paint.color = ink(50)
+        canvas.drawRect(p.x - 4f, p.y + 7f, p.x + 4f, p.y + 8f, paint)
+        paint.color = ink(170)
+        canvas.drawRect(p.x - 4f, p.y + 7f, p.x - 4f + 8f * body.durationFraction, p.y + 8f, paint)
+    }
+
+    private fun drawLightning(canvas: Canvas, effect: WeaponEffect) {
+        val delta = effect.end - effect.start
+        val length = delta.length()
+        if (length < 0.01f) return
+        val perpendicular = Vec2(-delta.y / length, delta.x / length)
+        val segments = (length / 9f).toInt().coerceIn(2, 12)
+        val phase = floor(effect.age * 30f)
+        val path = Path().apply { moveTo(effect.start.x, effect.start.y) }
+        for (i in 1 until segments) {
+            val noise = sin(i * 7.31f + effect.start.x * 0.13f + effect.end.y * 0.09f + phase * 2.7f)
+            val point = effect.start + delta * (i.toFloat() / segments) +
+                perpendicular * (noise * min(5f, length * 0.09f))
+            path.lineTo(point.x, point.y)
+        }
+        path.lineTo(effect.end.x, effect.end.y)
+        stroke((175 * effect.alpha).toInt(), 0.7f)
+        canvas.drawPath(path, paint)
+    }
+
+    /** Secondary projectiles retain their own appearance instead of sharing Repeater's long trail. */
+    fun drawProjectile(canvas: Canvas, bullet: Projectile): Boolean = when (bullet.source) {
+        WeaponId.OSCILLATOR -> {
+            actor(canvas, WeaponId.OSCILLATOR, bullet.position, 1.5f, alpha = 155)
+            true
+        }
+        WeaponId.SENTRY -> {
+            val direction = bullet.velocity.normalized()
+            for (i in 3 downTo 0) {
+                val p = bullet.position - direction * min(i * 3f, bullet.age * bullet.velocity.length())
+                circle(canvas, p, 2.1f - i * 0.3f, 160 - i * 38, 0.6f)
+            }
+            true
+        }
+        else -> false
     }
 
     fun drawArsenal(canvas: Canvas, world: CombatWorld, width: Float, height: Float) {
