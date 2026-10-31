@@ -14,7 +14,8 @@ draw = ImageDraw.Draw(sheet)
 for index, weapon in enumerate(weapons):
     image = Image.open(directory / f'weapon-{weapon}.png').convert('RGB')
     w, h = image.size
-    crop = image.crop((int(w * .12), int(h * .31), int(w * .94), int(h * .65)))
+    crop = image.crop((int(w * .12), max(0, int(h * .5 - w * .4)),
+                       int(w * .94), min(h, int(h * .5 + w * .4))))
     crop.thumbnail((width-16, height-40), Image.Resampling.LANCZOS)
     x, y = index % 3 * width, index // 3 * height
     sheet.paste(crop, (x + (width-crop.width)//2, y+38))
