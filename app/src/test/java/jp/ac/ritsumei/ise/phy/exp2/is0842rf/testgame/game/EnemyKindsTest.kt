@@ -144,11 +144,15 @@ class EnemyKindsTest {
     }
     @Test fun naturalArrivalsMissilesAndSplitsKeepTheSixteenPartLimitOverLongRuns() {
         val w=CombatWorld(CombatConfig(playerMaxHp=10000000),Random(29)).also { it.resize(800f,1000f) }
+        var sawHigherDroneTier = false
         repeat(3600) {
             w.update(1f)
             assertTrue("Population ${w.livingPopulation} at ${w.elapsedSeconds}",w.livingPopulation<=16)
-            assertTrue(w.enemies.filter { it.isAlive && it.definition.kind==EnemyKind.DRONE }.all { it.definition.tier<=2 })
+            val drones = w.enemies.filter { it.isAlive && it.definition.kind==EnemyKind.DRONE }
+            assertTrue(drones.all { it.definition.tier in 1..DroneTierCatalog.highestPublishedTier })
+            sawHigherDroneTier = sawHigherDroneTier || drones.any { it.definition.tier >= 3 }
         }
+        assertTrue("Mixed arrivals must reach Tier 3+ without a boss", sawHigherDroneTier)
     }
 
     @Test fun normalArrivalsCannotOccupyTheLastMissileSlotAndSilenceShooters() {

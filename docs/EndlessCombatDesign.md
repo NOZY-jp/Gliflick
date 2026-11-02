@@ -95,7 +95,22 @@ The [official enemy table](https://alias.black/glyphica/wiki_english.html) publi
 
 The same Wiki says Drones can appear enlarged or hastened: Enlarged triples HP, while Hastened doubles movement speed. It gives no mutation probability and does not say that the two forms can co-occur. This project keeps them mutually exclusive as requested and uses a configurable 5% combined chance per Drone spawn (2.5% for each form). Tier body scales are 1.0×, 2.0×, then 2.83× for Tiers 3–7; Enlarged multiplies that by 1.5×. This changes effective radius and size-based effect geometry; caption and health-bar positions move to leave room, but their font sizes and bar dimensions remain fixed. The body scales and mutation probability are local tuning, not published values. Mutations do not change tier contact damage.
 
-The Wiki describes Threat as rising during a run and says Endless uses the higher of Threat and a player-level adaptive value to determine spawn difficulty, but publishes neither the Threat formula nor tier thresholds. `DroneTierDistributionPolicy` leaves `Threat` untouched. The first 60 seconds are Tier 1 only. After that, progression is `clamp(max((elapsedSeconds - 60) / 600, (playerLevel - 1) / 20), 0, maxAvailableTier - 1)`; the Gaussian center moves by only 0.25 per progression step, and spread grows from 0.4 to 0.7 tiers. Tier 2's weight ramps in smoothly over one progression step, reaching about 22% at progression 1 while it is the only available higher tier. Tier 3 and above are excluded until `CombatWorld.notifyBossDefeated()` unlocks the next tier. There is no boss implementation yet, so current runs remain capped at Tier 2. Existing enemies keep their stats. These rates are prototype tuning, not a claim about the source game's exact Threat formula.
+`DroneTierDistributionPolicy` uses local time/level tuning independently of the public demo's species weights and class caps. The first 60 seconds are Tier 1 only. There is no boss gate: the previous gate left Tier 3+ permanently unavailable because bosses are not implemented. Progression is `clamp(max((elapsedSeconds - 60) / 210, ((playerLevel - 1) / 20) * openingWeight), 0, maxAvailableTier - 1)`. `openingWeight` is smoothstep of the first post-opening progression step, preventing high player levels from causing a jump at 60 seconds. The Gaussian centre is `1 + progression`; spread grows from 0.4 by 0.045 per step, capped at 0.7. Each tier above 1 multiplies its Gaussian weight by `smoothstep(clamp(progression - (tier - 2), 0, 1))`, so new tiers enter with zero probability and increase continuously. Normalize the weights per spawn. Existing enemies keep their stats; spawn density, mutations and population cap remain unchanged. These rates are prototype tuning, not the source game's exact Threat formula.
+
+At player level 1 (higher player levels can accelerate progression after the opening):
+
+| Elapsed | Tier 1 | Tier 2 | Tier 3 | Tier 4 |
+|---|---:|---:|---:|---:|
+| 0–1 min | 100% | 0% | 0% | 0% |
+| 2 min | 94.7% | 5.3% | 0% | 0% |
+| 3 min | 52.6% | 47.4% | 0% | 0% |
+| 4 min | 14.2% | 85.8% | 0% | 0% |
+| 5 min | 4.1% | 95.0% | 0.9% | 0% |
+| 6 min | 1.0% | 77.2% | 21.8% | 0% |
+| 8 min | <0.1% | 11.1% | 88.9% | 0% |
+| 10 min | <0.1% | 1.0% | 55.2% | 43.8% |
+
+These are conditional probabilities when a Drone is selected, not percentages of all species. `DroneTierProgressionTest` checks the early-only opening, six-minute distribution, continuous boundaries, monotonic expected tier, actual sampled spawns without a boss and the configured tier cap.
 
 The official [Update 12 announcement](https://steamcommunity.com/app/2400160/announcements/) says two stronger late-game Drone levels were added, but provides no balance values. The Wiki table still lists seven rows, so this implementation caps at tier 7 and leaves the two later rows out until their HP and contact-damage values are published or measured.
 
@@ -111,7 +126,7 @@ The official [Update 12 announcement](https://steamcommunity.com/app/2400160/ann
 | Player HP | 300 | User's reference image; also appears in the official Wiki's health example |
 | Drone speed / base radius | 5.95 logical dp/s / 4.5dp | Prototype screen tuning; speed reduced to 70% of the previous 8.5dp/s. Enlarged uses 1.5× numeric size locally. |
 | Drone tier appearance | Center disk stays constant; body scale 1 / 2 / 2.83, then remains 2.83 through Tier 7 | Outer circles are added through Tier 3; later tiers alter fill and holes without increasing the Tier 3 outer radius. Proportions follow the user's visual description. |
-| Drone tier weights | Tier 1 only for 60s; Tier 2 ramps in over 600s or 20 levels; Tier 3+ unlock one tier per boss defeat | Center shifts 0.25 per progression step; this deliberate local Drone gate differs from the public demo species/threat progression. |
+| Drone tier weights | Tier 1 only for 60s; one progression step per 210s or 20 levels, with each higher tier fading in | Centre shifts one tier per step; no boss gate. Six minutes / level 1 gives about 77% Tier 2 and 22% Tier 3. Local tuning differs from the public demo species/threat progression. |
 | Bullet speed / radius / shot interval | 520dp/s / 1.25dp / 120ms | Prototype screen tuning; public absolute values not verified |
 | Enemy count / spawn | Random single arrivals; 0.45/s base rate modulated 0.8×–1.2× over 120s; 16 alive maximum | Rate cloud, level multiplier, and cap are local tuning; there are no groups or interval timer. |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |

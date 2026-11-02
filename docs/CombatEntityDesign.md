@@ -22,7 +22,7 @@
 | Projectile | 弾1発の実行時状態。発射元、位置、速度、ダメージ、当たり判定などが候補。Repeater等の友軍弾に用いる。シューターミサイルはHPと入力語を持つEnemyとして分類する。 |
 | WarderBarrier | ウォーダーに紐づく回転バリア。敵本体とは別の所有者付き衝突エンティティ。所有者死亡時に消滅する。 |
 
-現在は`EnemyKind`（役割）、`EnemyVariant`（形態）、`EnemyShape`（外形）を分離。固定値は`EnemyDefinition`、個体の行動は`EnemyBehavior`、耐久値処理は`Durability`へ分ける。EnemyKindはDRONE / SHIELD_DRONE / SHOOTER / SHOOTER_MISSILE / WARDER / SPLITTER / SPLITTER_SHARDで、ティア・形状・突然変異を独立した定義値として選ぶ。各`Enemy`は数値の`size`を持ち、基準半径に掛けた有効半径を衝突と描画で共有する。Droneの中心円はTier1〜4で同寸、外周の円が増えるTier1〜3で全体の半径が広がり、Tier3以降は同じ外半径を保つ。文字と耐力バーは位置だけサイズに追従し、文字サイズとバー寸法は固定する。被弾円はヒット時の有効半径を基準に拡大する。武器は`MainWeapon`契約と個別の設定・発射方式へ分ける。`CombatSession`は共有入力判定の結果からクリティカル率とWord Rushを計算し、`WeaponRuntimeModifiers`として渡す。`WordRushDefinition`に出典が未公開の時間窓・倍率をまとめ、各武器が発射方式に応じて適用する。`EnemySpawnPolicy`は敵定義を選び、`EnemySpawnDensity`は確率的に一回一体の出現を決める。群れ数・出現間隔は持たない。今回確認した公開デモの適応値・Threat予算・特殊/エリート上限をEnemySpawnDifficultyへ分離。MixedEnemySpawnPolicyが種類とティアを抽選し、Droneの既存ボス制約は維持する。
+現在は`EnemyKind`（役割）、`EnemyVariant`（形態）、`EnemyShape`（外形）を分離。固定値は`EnemyDefinition`、個体の行動は`EnemyBehavior`、耐久値処理は`Durability`へ分ける。EnemyKindはDRONE / SHIELD_DRONE / SHOOTER / SHOOTER_MISSILE / WARDER / SPLITTER / SPLITTER_SHARDで、ティア・形状・突然変異を独立した定義値として選ぶ。各`Enemy`は数値の`size`を持ち、基準半径に掛けた有効半径を衝突と描画で共有する。Droneの中心円はTier1〜4で同寸、外周の円が増えるTier1〜3で全体の半径が広がり、Tier3以降は同じ外半径を保つ。文字と耐力バーは位置だけサイズに追従し、文字サイズとバー寸法は固定する。被弾円はヒット時の有効半径を基準に拡大する。武器は`MainWeapon`契約と個別の設定・発射方式へ分ける。`CombatSession`は共有入力判定の結果からクリティカル率とWord Rushを計算し、`WeaponRuntimeModifiers`として渡す。`WordRushDefinition`に出典が未公開の時間窓・倍率をまとめ、各武器が発射方式に応じて適用する。`EnemySpawnPolicy`は敵定義を選び、`EnemySpawnDensity`は確率的に一回一体の出現を決める。群れ数・出現間隔は持たない。今回確認した公開デモの適応値・Threat予算・特殊/エリート上限をEnemySpawnDifficultyへ分離。MixedEnemySpawnPolicyが種類とティアを抽選し、Droneはボス制約のない時間・レベル依存の独立したティア分布を使う。
 
 ## 敵の要件
 
@@ -72,7 +72,7 @@
 
 ## 参考にする公開仕様と取り込まない複雑性
 
-[Glyphica Wiki](https://alias.black/glyphica/wiki_english.html)はThreatとレベル依存の適応値、特殊/エリートの上限を説明する。以前は式を確認できなかったためThreatを未使用としていたが、2026-11-02に公式WebデモのSpawnerで式と抽選表を確認した。種類の抽選とクラス上限へ採用し、独自のランダム到着密度とDroneティアのボス制約を維持する。数式・採用範囲・推定値は[EnemyKindsDesign.md](EnemyKindsDesign.md)に集約する。
+[Glyphica Wiki](https://alias.black/glyphica/wiki_english.html)はThreatとレベル依存の適応値、特殊/エリートの上限を説明する。以前は式を確認できなかったためThreatを未使用としていたが、2026-11-02に公式WebデモのSpawnerで式と抽選表を確認した。種類の抽選とクラス上限へ採用し、独自のランダム到着密度とDroneの時間・レベル依存ティア分布を維持する。数式・採用範囲・推定値は[EnemyKindsDesign.md](EnemyKindsDesign.md)に集約する。
 
 参考値として、公式Wikiの敵バリアント一覧には次の範囲が掲載されている。新しい敵の固定性能はこの公開表から採用した。
 
@@ -92,7 +92,7 @@
 - 文字と耐力バーは敵の大きさに合わせて表示位置を離す。文字サイズと耐力バーの幅・高さは敵サイズで変えない。被弾円はヒット時の敵の有効半径から始まり、その半径に比例して120%まで拡大する。
 - ティア1〜7のマーカー形状は公式Wiki画像とユーザーの説明に合わせる。中心円はTier1〜4で一定サイズ。Tier2/3は外周リングを足し、Tier4は2・3段目のリング間を塗り、Tier5は中心円相当の穴を開ける。Tier3以降の外半径は同じ。
 - ドローンの基本移動速度は5.95dp/s（以前の8.5dp/sの70%）。加速化形態はこの基本値の2倍。
-- `DroneTierDistributionPolicy`は開始60秒をTier1のみとし、その後Tier2を長い時間幅でなめらかに加える。Tier3以降はボス撃破通知ごとに一段階ずつ解禁する。現在ボス自体は未実装なのでTier2までに制限される。個々のスポーンで抽選し、レベルアップ時に既存敵の能力を変えない。公開されていないThreat式を再現したとは扱わない。
+- `DroneTierDistributionPolicy`は開始60秒をTier1のみとし、その後210秒または20レベルごとに分布中心を1ティア進める。各上位ティアの重みはそれぞれ一段階の進行幅で0から滑らかに加える。開始後のレベル補正にも同じフェードを適用する。ボス撃破は不要。6分・レベル1でTier1約1%、Tier2約77%、Tier3約22%となる。個々のスポーンで抽選し、レベルアップ時に既存敵の能力を変えない。公開されていないThreat式を再現したとは扱わない。
 - 同時に生存する敵は`CombatConfig.maxEnemiesAlive`で制限し、現行値は16体。満員中は新たな出現を行わないが、グループ出現や固定インターバルには戻さない。
 
 ## 実装時の確認項目

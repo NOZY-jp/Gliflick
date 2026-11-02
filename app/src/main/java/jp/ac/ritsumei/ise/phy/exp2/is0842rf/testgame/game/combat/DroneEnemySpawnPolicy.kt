@@ -50,17 +50,17 @@ object DroneTierCatalog {
 }
 
 data class DroneTierDistributionParameters(
-    val tierTwoOnlySeconds: Double = 60.0,
-    val secondsPerTierProgress: Double = 600.0,
+    val tierOneOnlySeconds: Double = 60.0,
+    val secondsPerTierProgress: Double = 210.0,
     val playerLevelsPerTierProgress: Int = 20,
-    val centerShiftPerTierProgress: Double = 0.25,
+    val centerShiftPerTierProgress: Double = 1.0,
     val initialSpread: Double = 0.4,
     val spreadGrowthPerTier: Double = 0.045,
     val maximumSpread: Double = 0.7,
     val maximumTier: Int = DroneTierCatalog.highestPublishedTier
 ) {
     init {
-        require(tierTwoOnlySeconds >= 0.0 && tierTwoOnlySeconds.isFinite())
+        require(tierOneOnlySeconds >= 0.0 && tierOneOnlySeconds.isFinite())
         require(secondsPerTierProgress > 0.0 && secondsPerTierProgress.isFinite())
         require(playerLevelsPerTierProgress > 0)
         require(centerShiftPerTierProgress >= 0.0 && centerShiftPerTierProgress.isFinite())
@@ -91,11 +91,14 @@ class DroneTierDistributionPolicy(
         require(maximumAvailableTier in 1..DroneTierCatalog.highestPublishedTier)
         val tierLimit = min(parameters.maximumTier, maximumAvailableTier)
         val secondsAfterTierOneOpening =
-            (elapsedSeconds - parameters.tierTwoOnlySeconds).coerceAtLeast(0.0)
+            (elapsedSeconds - parameters.tierOneOnlySeconds).coerceAtLeast(0.0)
         val timeProgress = secondsAfterTierOneOpening / parameters.secondsPerTierProgress
+        // Fade level adaptation in too: leaving the Tier-1 opening must not jump at high levels.
+        val openingProgress = timeProgress.coerceIn(0.0, 1.0)
+        val levelWeight = openingProgress * openingProgress * (3.0 - 2.0 * openingProgress)
         val levelProgress = (playerLevel - 1).coerceAtLeast(0).toDouble() /
-            parameters.playerLevelsPerTierProgress
-        val progression = if (elapsedSeconds < parameters.tierTwoOnlySeconds) 0.0 else
+            parameters.playerLevelsPerTierProgress * levelWeight
+        val progression = if (elapsedSeconds < parameters.tierOneOnlySeconds) 0.0 else
             max(timeProgress, levelProgress).coerceAtMost((tierLimit - 1).toDouble())
         val center = 1.0 + progression * parameters.centerShiftPerTierProgress
         val spread = min(parameters.initialSpread + progression * parameters.spreadGrowthPerTier,
@@ -103,8 +106,8 @@ class DroneTierDistributionPolicy(
         val weights = DroneTierCatalog.tiers.take(tierLimit).map { tier ->
             val distance = (tier.tier - center) / spread
             val gaussianWeight = exp(-0.5 * distance * distance)
-            val unlockProgress = if (tier.tier <= 1) 1.0 else if (tier.tier == 2)
-                progression.coerceIn(0.0, 1.0) else 1.0
+            val unlockProgress = if (tier.tier <= 1) 1.0 else
+                (progression - (tier.tier - 2)).coerceIn(0.0, 1.0)
             val smoothUnlock = unlockProgress * unlockProgress * (3.0 - 2.0 * unlockProgress)
             gaussianWeight * smoothUnlock
         }
@@ -149,14 +152,8 @@ class DroneEnemySpawnPolicy(
     private val tiers: DroneTierDistributionPolicy = DroneTierDistributionPolicy(),
     private val mutations: DroneMutationPolicy = DroneMutationPolicy()
 ) : EnemySpawnPolicy {
-    private var maximumAvailableTier = min(2, tiers.maximumConfiguredTier)
-
-    override fun onBossDefeated(bossesDefeated: Int) {
-        maximumAvailableTier = min(2 + bossesDefeated.coerceAtLeast(0), tiers.maximumConfiguredTier)
-    }
-
     override fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random): EnemyDefinition {
-        val tier = tiers.choose(elapsedSeconds, playerLevel, random, maximumAvailableTier)
+        val tier = tiers.choose(elapsedSeconds, playerLevel, random)
         val mutation = mutations.choose(random)
         return DroneTierCatalog.definition(tier, mutation)
     }
