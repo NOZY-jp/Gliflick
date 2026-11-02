@@ -4,7 +4,7 @@
 
 ## Visual contract
 
-- Title: Glyflick. Four commands: play, armory, upgrades, options. When the keyboard is hidden, a `Launch IME` action appears at the bottom and opens the same hidden input field.
+- Title: Gliflick (project renamed on 2026-11-02). Four commands: play, armory, upgrades, options. When the keyboard is hidden, a `Launch IME` action appears at the bottom and opens the same hidden input field.
 - Warm off-white background `#EFEFE5`, fine grid `#E4E4D8`, pale geometric outlines `#C7C7BC`, ink `#464646`, and pale untyped letters. The untyped text stays slightly darker than Figma's `#CDCDCD` at `#B8B8B8` so it remains legible on the warmer background.
 - Keep the composition minimal. `Launch IME` is the requested action from Figma, not an instructional caption. Do not add helper text or retry explanations.
 - The grey IME rectangle and its label in the earlier Figma frame represent the system keyboard only. They are never drawn by the app. The revised background node `14:98` continues the grid underneath the keyboard region.

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">TestGame</string>
+    <string name="app_name">Gliflick</string>
     <string name="keyboard_input_title">キーボード入力テスト</string>
     <string name="keyboard_input_empty">受信文字: （まだ入力されていません）</string>
     <string name="keyboard_input_received">受信文字: %1$s</string>
@@ -9,7 +9,7 @@
     <string name="streak_initial">ストリーク: 0字</string>
     <string name="mistype_count">ミス: %1$d</string>
     <string name="mistype_initial">ミス: 0</string>
-    <string name="menu_title">Glyflick</string>
+    <string name="menu_title">Gliflick</string>
     <string name="menu_launch_ime">Launch IME</string>
     <string name="menu_input_accessibility">メニュー名を英字で入力</string>
     <string name="keyboard_input_from_menu">%1$s → 入力テスト</string>

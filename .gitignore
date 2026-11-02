@@ -13,3 +13,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local credentials and Jujutsu metadata
+/.jj/
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem

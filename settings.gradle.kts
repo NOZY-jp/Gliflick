@@ -22,6 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TestGame"
+rootProject.name = "Gliflick"
 include(":app")
- 

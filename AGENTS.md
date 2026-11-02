@@ -6,7 +6,7 @@
 ## Title UI
 
 - Read docs/TitleMenuDesign.md before changing the title menu. The Figma IME rectangle is a keyboard placeholder, not a product panel: the grid continues underneath it. Never render the IME label/grey rectangle as app UI.
-- Pale menu letters mean not yet typed; dark letters show actual or simulated input. This is not a disabled-menu state. Keep the white/light-grey/charcoal tone and the intentional title Glyflick.
+- Pale menu letters mean not yet typed; dark letters show actual or simulated input. This is not a disabled-menu state. Keep the white/light-grey/charcoal tone and the title Gliflick.
 - Preserve the minimal composition: no visible instructional captions or retry explanations on the title screen unless explicitly requested. The Figma `Launch IME` action is shown only while the system keyboard is hidden. Completion scales 1× to 2× around the word's own fixed centre and fades opacity 100% to 0%.
 - The latest Figma frame is `14:97`; its grid comes from `app/src/main/res/drawable-nodpi/menu_grid.png`, regenerated with `docs/verification/render-menu-grid.py`. Background circles and squares remain native shapes, independently animated outward and faded away during completion; do not flatten those shapes into the grid PNG.
 - Tapping a menu command simulates one character every 50ms. Keep the four menu rows aligned at the Figma left edge and use their text lengths to form the rising/falling right edge.
@@ -43,30 +43,7 @@
 - Regression checks for keyboard fixes must cover raw Latin and the relevant IME composition snapshots, including the resulting display and completion event.
 
 <!-- LLMWIKI:START -->
-# LLMwiki
+## Local memory integration
 
-- Vault: `\\100.104.189.113\e\home\wiki`
-- マスター指示: `\\100.104.189.113\e\home\wiki\WIKIROOT.md`
-- 共通ルール: `\\100.104.189.113\e\home\wiki\_shared\AI_SHARED_RULES.md`
-- ワークフロー: `\\100.104.189.113\e\home\wiki\_shared\WORKFLOWS.md`
-- Wiki 品質: `\\100.104.189.113\e\home\wiki\_shared\WIKI_QUALITY_SYSTEM.md`
-- ユーザー設定: `\\100.104.189.113\e\home\wiki\preferences\index.md`
-- プロジェクトノート: `\\100.104.189.113\e\home\wiki\projects\glyphica-android.md`
-- プロジェクト索引: `\\100.104.189.113\e\home\wiki\projects\index.md`
-- 作業資料カテゴリ索引: `\\100.104.189.113\e\home\wiki\materials\index.md`
-- 作業資料索引: `\\100.104.189.113\e\home\wiki\materials\glyphica-android\index.md`
-- 作業資料ディレクトリ: `\\100.104.189.113\e\home\wiki\materials\glyphica-android`
-- 当日の日報: `\\100.104.189.113\e\home\wiki\daily\2026-10-26.md`
-- 知見: `\\100.104.189.113\e\home\wiki\knowledge`
-- 意思決定: `\\100.104.189.113\e\home\wiki\decisions`
-- セッション: `\\100.104.189.113\e\home\wiki\daily\sessions`
-- テンプレート: `\\100.104.189.113\e\home\wiki\Template`
-
-## 作業開始
-
-変更前に共通ルール、ワークフロー、Wiki 品質、ユーザー設定、プロジェクトノート、当日の日報（存在する場合）、関連知見を読むこと。作業資料はカテゴリ索引、プロジェクト索引の順に読んでからディレクトリを一覧し、今回必要な原稿を読むこと。人間の原稿は明示的な編集依頼なしに変更しない。
-
-## 作業終了
-
-意味のある作業の後、後日の再開に必要な状態と判断を `projects`、`decisions`、`knowledge`、必要な場合だけ `daily/sessions` へ反映すること。訂正では誤った正本を置換し、訂正用の追記を残さないこと。
+Machine-specific memory vault paths are configured through the developer's global agent instructions. They are not required to build or run Gliflick. If a local vault is configured in your environment, follow its guidance for project/session records; keep local access details outside this public repository.
 <!-- LLMWIKI:END -->

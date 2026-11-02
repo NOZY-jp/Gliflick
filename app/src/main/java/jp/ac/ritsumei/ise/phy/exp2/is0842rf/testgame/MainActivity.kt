@@ -14,7 +14,7 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.input.GameInputControl
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.input.ImeInputTrace
 import android.content.pm.ApplicationInfo
 
-private const val TAG = "TestGame"
+private const val TAG = "Gliflick"
 
 open class MainActivity : AppCompatActivity() {
     private lateinit var imeInputHost: GameImeEditText

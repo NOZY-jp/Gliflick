@@ -1,3 +1,3 @@
 <resources>
-    <style name="Theme.TestGame" parent="Theme.Material3.DayNight.NoActionBar" />
+    <style name="Theme.Gliflick" parent="Theme.Material3.DayNight.NoActionBar" />
 </resources>
