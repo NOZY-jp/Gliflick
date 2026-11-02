@@ -1,0 +1,5 @@
+jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.EnemyKindsInstrumentedTest:.
+
+Time: 9.7
+
+OK (1 test)

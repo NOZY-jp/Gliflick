@@ -16,6 +16,8 @@ data class CombatConfig(val spawningEnabled: Boolean = true, val maxEnemiesAlive
 
 fun interface EnemySpawnPolicy {
     fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random): EnemyDefinition
+    fun choose(elapsedSeconds: Double, playerLevel: Int, random: Random, living: List<Enemy>): EnemyDefinition =
+        choose(elapsedSeconds, playerLevel, random)
     fun onBossDefeated(bossesDefeated: Int) = Unit
 }
 class FixedEnemySpawnPolicy(private val definition: EnemyDefinition = EnemyDefinition()) : EnemySpawnPolicy {
@@ -33,7 +35,7 @@ sealed interface CombatEvent {
 class CombatWorld(
     val config: CombatConfig = CombatConfig(),
     private val random: Random = Random.Default,
-    private val spawnPolicy: EnemySpawnPolicy = DroneEnemySpawnPolicy(),
+    private val spawnPolicy: EnemySpawnPolicy = MixedEnemySpawnPolicy(populationLimit = config.maxEnemiesAlive),
     val mainWeapon: MainWeapon = Repeater(),
     private val spawnDensity: EnemySpawnDensity = RandomEnemySpawnDensity()
 ) {
@@ -44,6 +46,9 @@ class CombatWorld(
         }
     }
     private val mutableEnemies = mutableListOf<Enemy>()
+    private val mutableBarriers = mutableListOf<WarderBarrier>()
+    val barriers: List<WarderBarrier> get() = mutableBarriers
+    val livingPopulation get() = mutableEnemies.filter { it.isAlive }.sumOf { it.populationCost }
     private val mutableProjectiles = mutableListOf<Projectile>()
     private val mutableBursts = mutableListOf<DeathBurst>()
     private val mutableHitFeedback = mutableListOf<HitFeedback>()
@@ -76,7 +81,7 @@ class CombatWorld(
     var kills = 0; private set
     var pendingLevelUps = 0; private set
     var bossesDefeated = 0; private set
-    /** Placeholder until the public Threat formula and its mapping to spawns are known. */
+    /** Public demo threat budget; arrival timing and Drone-tier gates retain local tuning. */
     var threat: Threat = Threat.NONE
         private set
     val nextLevelExperience get() = config.progression.firstLevelExperience +
@@ -93,6 +98,9 @@ class CombatWorld(
             mutableEnemies.forEach {
                 it.position = it.position.scaled(sx, sy)
                 it.previousPosition = it.position
+                it.deploymentPosition = it.deploymentPosition?.scaled(sx, sy)
+                it.flightDirection = it.flightDirection.scaled(sx, sy).normalized()
+                it.releaseOffset = it.releaseOffset.scaled(sx, sy)
                 it.spawnOrigin = it.spawnOrigin.scaled(sx, sy)
             }
             mutableProjectiles.forEach {
@@ -112,14 +120,17 @@ class CombatWorld(
         player.position = Vec2(width / 2f, height / 2f)
     }
 
-    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level, random)): Enemy =
+    fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level, random, enemies)): Enemy =
         Enemy(nextEnemyId++, definition, position).also {
+        it.deploymentPosition = clampPoint(position, it.radius + 18f)
+        if (definition.kind == EnemyKind.SHOOTER) it.initialAttackDelay = (50f + random.nextFloat() * 100f) / 60f
         mutableEnemies += it
+        if (definition.kind == EnemyKind.WARDER) mutableBarriers += WarderBarrier(it)
         events += CombatEvent.Spawned(it)
     }
 
     fun target(enemyId: Long) {
-        mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let { mainWeapon.target(it.id, it.position) }
+        mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let { mainWeapon.target(it.id, it.aimPosition) }
     }
 
     fun completeWord(word: jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordDefinition, enemyId: Long) {
@@ -225,12 +236,22 @@ class CombatWorld(
 
     fun areaDamage(position: Vec2, radius: Float, damage: Int, source: WeaponId, type: DamageType,
                    allowCrit: Boolean = true, excludedEnemy: Long? = null,
-                   criticalChance: Float? = null, criticalMultiplier: Float? = null) {
-        enemies.filter { it.isAlive && it.id != excludedEnemy && (it.position - position).length() <= radius + it.radius }
-            .forEach { dealDamage(it.id, damage, source, type,
+                   criticalChance: Float? = null, criticalMultiplier: Float? = null,
+                   excludedPart: Int? = null) {
+        val contacts = enemies.filter { it.isAlive }.flatMap { enemy ->
+            enemy.hitCircles().filter { circle ->
+                (enemy.id != excludedEnemy || (excludedPart != null && circle.part != excludedPart)) &&
+                    (circle.position - position).length() <= radius + circle.radius
+            }.map { enemy to it.part }
+        }
+        contacts.forEach { (original, part) ->
+            val target = resolvePart(original, part) ?: return@forEach
+            dealDamage(target.first.id, damage, source, type,
                 if (allowCrit) criticalChance ?: (0.01f + (weaponState(source)?.bonus(WeaponStat.CRIT) ?: 0f) +
                     currentWeaponModifiers.criticalChanceBonus) else 0f,
-                criticalMultiplier ?: (2f + (weaponState(source)?.bonus(WeaponStat.CRIT_MULTIPLIER) ?: 0f))) }
+                criticalMultiplier ?: (2f + (weaponState(source)?.bonus(WeaponStat.CRIT_MULTIPLIER) ?: 0f)),
+                hitPart = target.second)
+        }
     }
 
     fun damageEnemy(enemyId: Long, damage: Int, incomingAngle: Float? = null) {
@@ -239,38 +260,41 @@ class CombatWorld(
 
     fun dealDamage(enemyId: Long, damage: Int, source: WeaponId, type: DamageType,
                    criticalChance: Float = 0f, criticalMultiplier: Float = 1.5f,
-                   inflictStatus: Boolean = true, hitPosition: Vec2? = null, incomingAngle: Float? = null) {
+                   inflictStatus: Boolean = true, hitPosition: Vec2? = null, incomingAngle: Float? = null,
+                   hitPart: Int = 0) {
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
-            val bleeding = it.statuses.any { status -> status.type == DamageType.KINETIC }
+            if (isProtected(it)) return
+            val bleeding = it.statuses.any { status -> status.type == DamageType.KINETIC && status.partIndex == hitPart }
             val bloodbathRank = weaponState(WeaponId.CHOPPER)?.rank(SecondaryEvolution.BLOODBATH) ?: 0
             val bloodBonus = if (source == WeaponId.CHOPPER && bleeding && bloodbathRank > 0)
                 (if (bloodbathRank == 2) 0.25f else 0.1f) else 0f
             val typedDamage = damage * (1f + EvolutionEffects.damageTypeBonus(weaponStates, type)) *
                 (1f + bloodBonus) * if (doubleDamageRemaining > 0f) 2f else 1f
             val actual = (typedDamage * if (random.nextFloat() < criticalChance.coerceIn(0f, 1f)) criticalMultiplier else 1f).roundToInt()
-            val applied = it.takeDamage(actual)
+            val applied = it.takeDamage(actual, hitPart)
             if (applied > 0) {
                 val angle = incomingAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
                 mutableHitFeedback += HitFeedback(hitPosition ?: it.position, applied, it.radius, angle, random)
                 damageSamples += DamageSample(elapsedSeconds, source, applied)
-                if (inflictStatus && it.isAlive) applyAttackStatuses(it, source, type)
+                if (inflictStatus && it.isAlive) applyAttackStatuses(it, source, type, hitPart)
             }
-            if (!it.isAlive) {
+            if (!it.isAlive || it.splitterHealth?.hasBrokenPart == true) {
                 if (source == WeaponId.CHOPPER && bleeding && bloodbathRank > 0 &&
                     random.nextFloat() < if (bloodbathRank == 2) 0.25f else 0.1f) doubleDamageRemaining = 10f
-                die(it, awardExperience = true, source = source)
+                if (it.definition.splitter != null) releaseSplitter(it, source, true)
+                else die(it, awardExperience = true, source = source)
             }
         }
     }
 
-    private fun applyAttackStatuses(enemy: Enemy, source: WeaponId, type: DamageType) {
+    private fun applyAttackStatuses(enemy: Enemy, source: WeaponId, type: DamageType, part: Int = 0) {
         val state = weaponState(source)
         val saw = weaponState(WeaponId.CHOPPER)?.rank(SecondaryEvolution.SAW_LAUNCHER) ?: 0
         fun roll(type: DamageType, chance: Float) {
             if (chance <= 0f || random.nextFloat() >= chance) return
             if (type == DamageType.COLD) { enemy.frozenSeconds = 2f; return }
-            val existing = enemy.statuses.firstOrNull { it.type == type }
-            if (existing != null) existing.remaining = 5f else enemy.statuses += EnemyStatus(type, source)
+            val existing = enemy.statuses.firstOrNull { it.type == type && it.partIndex == part }
+            if (existing != null) existing.remaining = 5f else enemy.statuses += EnemyStatus(type, source, partIndex = part)
         }
         var chance = if (type == DamageType.CHEMICAL) 0.1f else if (type == DamageType.COLD) 0.03f else 0.03f
         if (type == DamageType.ELECTRIC) {
@@ -323,6 +347,9 @@ class CombatWorld(
         doubleDamageRemaining = (doubleDamageRemaining - dt).coerceAtLeast(0f)
         currentWeaponModifiers = weaponModifiers
         elapsedSeconds += dt
+        threat = Threat(EnemySpawnDifficulty.at(elapsedSeconds, level).threatBudget.toDouble())
+        mutableBarriers.removeAll { !it.isAlive }
+        mutableBarriers.forEach { it.advance(dt) }
         while (damageSamples.firstOrNull()?.let { it.time < elapsedSeconds - 10.0 } == true) damageSamples.removeFirst()
         mutableEffects.forEach { it.age += dt }
         mutableEffects.removeAll { it.age >= it.lifetime }
@@ -334,13 +361,18 @@ class CombatWorld(
             }
         }
         mutableEnemies.filter { it.isAlive }.forEach { enemy ->
+            if (enemy.parentId != null && enemy.activationProgress < 1f &&
+                enemies.none { it.id == enemy.parentId && it.isAlive }) {
+                die(enemy, awardExperience = false)
+                return@forEach
+            }
             enemy.statuses.toList().forEach { status ->
                 status.remaining -= dt
                 status.cooldown -= dt
                 if (status.remaining > 0f && status.cooldown <= 0f) {
                     status.cooldown += 0.5f
                     dealDamage(enemy.id, statusDamage(status.type),
-                        status.source, status.type, inflictStatus = false)
+                        status.source, status.type, inflictStatus = false, hitPart = status.partIndex)
                     if (status.type == DamageType.ELECTRIC) enemies.filter {
                         it.isAlive && it.id != enemy.id && (it.position - enemy.position).length() <= 30f * if (weaponStates.any { state -> state.rank(SecondaryEvolution.RESTRICTED_AREA) == 2 }) 1.3f else 1f
                     }.forEach { dealDamage(it.id, statusDamage(status.type), status.source, status.type, inflictStatus = false) }
@@ -349,16 +381,26 @@ class CombatWorld(
             enemy.statuses.removeAll { it.remaining <= 0f }
             if (!enemy.isAlive) return@forEach
             enemy.advance(dt, player.position)
-            if ((enemy.position - player.position).length() <= enemy.radius + player.radius) {
+            enemy.drainActions().forEach { action -> when (action) {
+                is EnemyAction.FireMissile -> launchEnemyMissile(enemy, action.direction)
+            } }
+            val contact = if (enemy.activationProgress >= 1f) enemy.hitCircles().firstOrNull {
+                sweptCircleHit(it.previousPosition - player.position, it.position - player.position,
+                    it.radius + player.radius) != null
+            } else null
+            if (contact != null) {
                 player.takeDamage(enemy.definition.contactDamage)
-                die(enemy, awardExperience = false)
+                if (enemy.definition.splitter != null) {
+                    enemy.takeDamage(Int.MAX_VALUE, contact.part)
+                    releaseSplitter(enemy, null, false)
+                } else die(enemy, awardExperience = false)
             }
         }
         mutableSecondaryWeapons.forEach { it.update(this, dt) }
         mutableActors.toList().forEach { it.update(this, dt); it.captureMotion(dt) }
         mutableActors.removeAll { it.finished }
         val actions = mainWeapon.update(dt, player.position, { id ->
-            mutableEnemies.firstOrNull { it.id == id && it.isAlive }?.position
+            mutableEnemies.firstOrNull { it.id == id && it.isAlive }?.aimPosition
         }, weaponModifiers)
         actions.forEach { action -> when (action) {
             is WeaponAction.LaunchProjectile -> {
@@ -370,27 +412,30 @@ class CombatWorld(
         val spent = mutableSetOf<Projectile>()
         mutableProjectiles.forEach { projectile ->
             projectile.advance(dt)
+            val barrierFraction = barriers.filter { it.isAlive }.mapNotNull { it.hitFraction(projectile) }.minOrNull()
             if (projectile.penetrates) {
-                val hits = mutableEnemies.filter { it.isAlive && it.id !in projectile.hitEnemyIds }.mapNotNull { enemy ->
-                    sweptCircleHit(projectile.previousPosition - enemy.previousPosition,
-                        projectile.position - enemy.position, projectile.radius + enemy.radius)?.let { enemy to it }
-                }.sortedBy { it.second }
-                hits.forEach { (enemy, fraction) ->
-                    dealDamage(enemy.id, projectile.damage, projectile.source, projectile.damageType,
+                val hits = projectileHits(projectile).filter { barrierFraction == null || it.fraction < barrierFraction }
+                hits.forEach { hit ->
+                    if ((hit.enemy.id to hit.part) in projectile.hitPartKeys) return@forEach
+                    val target = resolvePart(hit.enemy, hit.part) ?: return@forEach
+                    projectile.hitPartKeys += hit.enemy.id to hit.part
+                    projectile.hitPartKeys += target.first.id to target.second
+                    dealDamage(target.first.id, projectile.damage, projectile.source, projectile.damageType,
                         projectile.criticalChance, projectile.criticalDamageMultiplier,
-                        hitPosition = enemy.previousPosition + (enemy.position - enemy.previousPosition) * fraction,
-                        incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x))
+                        hitPosition = hit.enemy.previousPosition + (hit.enemy.position - hit.enemy.previousPosition) * hit.fraction,
+                        incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x), hitPart = target.second)
                     if (projectile.hitEnemyIds.isEmpty()) projectile.damage = (projectile.damage * projectile.ricochetDamageMultiplier).roundToInt()
-                    projectile.hitEnemyIds += enemy.id
+                    projectile.hitEnemyIds += target.first.id
                 }
-                if (projectile.position.x !in -32f..width + 32f || projectile.position.y !in -32f..height + 32f) spent += projectile
+                if (barrierFraction != null || outside(projectile.position)) spent += projectile
                 return@forEach
             }
-            val hit = mutableEnemies.asSequence().filter { it.isAlive && it.id !in projectile.hitEnemyIds }.mapNotNull { enemy ->
-                sweptCircleHit(projectile.previousPosition - enemy.previousPosition,
-                    projectile.position - enemy.position, projectile.radius + enemy.radius)
-                    ?.let { enemy to it }
-            }.minByOrNull { it.second }
+            val collision = projectileHits(projectile).firstOrNull()
+            if (barrierFraction != null && (collision == null || barrierFraction <= collision.fraction)) {
+                spent += projectile
+                return@forEach
+            }
+            val hit = collision?.let { it.enemy to it.fraction }
             if (hit != null) {
                 val impactPosition = projectile.previousPosition +
                     (projectile.position - projectile.previousPosition) * hit.second
@@ -400,14 +445,14 @@ class CombatWorld(
                 val incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x)
                 dealDamage(hit.first.id, projectile.damage, projectile.source, projectile.damageType,
                     projectile.criticalChance, projectile.criticalDamageMultiplier,
-                    hitPosition = enemyPositionAtImpact, incomingAngle = incomingAngle)
+                    hitPosition = enemyPositionAtImpact, incomingAngle = incomingAngle, hitPart = collision!!.part)
                 if (projectile.freezeChance > 0f && random.nextFloat() < projectile.freezeChance)
                     hit.first.frozenSeconds = 2f
                 if (projectile.explosionRadius > 0f) {
                     areaDamage(enemyPositionAtImpact, projectile.explosionRadius, projectile.damage,
                         projectile.source, DamageType.EXPLOSIVE, excludedEnemy = hit.first.id,
                         criticalChance = projectile.criticalChance,
-                        criticalMultiplier = projectile.criticalDamageMultiplier)
+                        criticalMultiplier = projectile.criticalDamageMultiplier, excludedPart = collision!!.part)
                     addEffect(WeaponEffect(enemyPositionAtImpact, enemyPositionAtImpact,
                         DamageType.EXPLOSIVE, projectile.explosionRadius, 0.3f))
                 }
@@ -427,19 +472,88 @@ class CombatWorld(
                 projectile.position.y !in -32f..height + 32f) spent += projectile
         }
         mutableProjectiles.removeAll(spent)
-        val livingCount = mutableEnemies.count { it.isAlive }
+        val livingCount = livingPopulation
         if (config.spawningEnabled && livingCount < config.maxEnemiesAlive &&
+            arrivalCapacity(enemies, config.maxEnemiesAlive) > 0 &&
             spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
-            val definition = spawnPolicy.choose(elapsedSeconds, level, random)
-            spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
+            val definition = spawnPolicy.choose(elapsedSeconds, level, random, enemies)
+            if ((definition.splitter?.partCount ?: 1) <= arrivalCapacity(enemies, config.maxEnemiesAlive))
+                spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
         }
     }
 
-    private fun die(enemy: Enemy, awardExperience: Boolean, source: WeaponId? = null) {
+    fun isProtected(enemy: Enemy): Boolean = enemy.definition.kind != EnemyKind.WARDER && enemy.isAlive &&
+        barriers.any { it.isAlive && !outside(it.owner.position, it.owner.radius) &&
+            (enemy.position - it.owner.position).length() < it.protectionRadius }
+
+    private fun outside(point: Vec2, margin: Float = 32f) =
+        point.x !in -margin..width + margin || point.y !in -margin..height + margin
+
+    private data class ProjectileContact(val enemy: Enemy, val part: Int, val fraction: Float)
+    private fun projectileHits(projectile: Projectile): List<ProjectileContact> = enemies
+        .filter { it.isAlive && (it.id !in projectile.hitEnemyIds ||
+            (projectile.penetrates && it.definition.splitter != null)) }.flatMap { enemy ->
+            enemy.hitCircles().filter { (enemy.id to it.part) !in projectile.hitPartKeys }.mapNotNull { circle ->
+                sweptCircleHit(projectile.previousPosition - circle.previousPosition,
+                    projectile.position - circle.position, projectile.radius + circle.radius)
+                    ?.let { ProjectileContact(enemy, circle.part, it) }
+            }
+        }.sortedBy { it.fraction }
+
+    private fun launchEnemyMissile(shooter: Enemy, direction: Vec2) {
+        if (!shooter.isAlive || livingPopulation >= config.maxEnemiesAlive) return
+        val definition = EnemyCatalog.definition(EnemyKind.SHOOTER_MISSILE, shooter.definition.tier)
+        val offset = listOf(60f, 70f, 80f, 85f, 85f)[shooter.definition.tier - 1] * EnemyCatalog.UNIT
+        val position = shooter.position + direction * offset
+        spawnEnemy(position, definition).also {
+            it.flightDirection = direction
+            it.parentId = shooter.id
+            it.spawnOrigin = shooter.spawnOrigin
+        }
+    }
+
+    private fun releaseSplitter(enemy: Enemy, source: WeaponId?, award: Boolean) {
+        if (enemy.deathAge != null) return
+        val partHealth = enemy.splitterHealth!!.partHealth.toList()
+        val circles = enemy.hitCircles()
+        // Retire the formation before inserting survivors; their population slots were reserved.
+        die(enemy, awardExperience = award, source = source,
+            lastAim = circles.firstOrNull { partHealth[it.part] == 0 }?.position ?: enemy.position)
+        circles.forEach { circle ->
+            val hp = partHealth[circle.part]
+            if (hp <= 0) return@forEach
+            val definition = EnemyCatalog.definition(EnemyKind.SPLITTER_SHARD, enemy.definition.tier)
+            spawnEnemy(circle.position, definition).also { shard ->
+                enemy.releasedPartIds[circle.part] = shard.id
+                projectiles.filter { (enemy.id to circle.part) in it.hitPartKeys }.forEach { projectile ->
+                    projectile.hitEnemyIds += shard.id
+                    projectile.hitPartKeys += shard.id to 0
+                }
+                shard.takeDamage(definition.maxHp - hp)
+                shard.frozenSeconds = enemy.frozenSeconds
+                shard.statuses += enemy.statuses.filter { it.partIndex == circle.part && it.remaining > 0f }.map {
+                    EnemyStatus(it.type, it.source, it.remaining).also { copy -> copy.cooldown = it.cooldown }
+                }
+                shard.angle = enemy.angle + circle.part * 2f * kotlin.math.PI.toFloat() / circles.size
+                shard.releaseOffset = (circle.position - enemy.position).normalized() * (12f + random.nextFloat() * 20f)
+                shard.spawnOrigin = enemy.spawnOrigin
+            }
+        }
+    }
+
+    private fun resolvePart(enemy: Enemy, part: Int): Pair<Enemy, Int>? {
+        if (enemy.isAlive) return enemy to part
+        val released = enemy.releasedPartIds[part] ?: return null
+        return enemies.firstOrNull { it.id == released && it.isAlive }?.let { it to 0 }
+    }
+
+    private fun die(enemy: Enemy, awardExperience: Boolean, source: WeaponId? = null,
+                    lastAim: Vec2 = enemy.aimPosition) {
         if (enemy.deathAge != null) return
         enemy.takeDamage(Int.MAX_VALUE)
         enemy.deathAge = 0f
-        mainWeapon.targetDied(enemy.id, enemy.position)
+        mutableBarriers.removeAll { it.owner.id == enemy.id }
+        mainWeapon.targetDied(enemy.id, lastAim)
         mutableBursts += DeathBurst(enemy.position, random)
         events += CombatEvent.Died(enemy.id, enemy.position)
         if (awardExperience) {

@@ -1,6 +1,6 @@
 # Repeater endless combat
 
-2026-10-30. Repeater endless combat, Drone enemies, level-up choices and eleven secondary weapons.
+2026-11-02. Repeater endless combat, five enemy families, level-up choices and eleven secondary weapons. See [EnemyKindsDesign.md](EnemyKindsDesign.md) for the implemented enemy roster and source-derived parameters.
 
 ## Goal
 
@@ -8,9 +8,9 @@ Play opens combat immediately. A fixed central player, elapsed timer, level, lin
 
 ## Structure
 
-- `EnemyDefinition` separates kind, variant, shape and fixed balance. Each `Enemy` creates its own `EnemyBehavior` and `Durability`; pursuit and ordinary HP are the current implementations. Shields or immunity can replace durability without changing projectile collision.
+- `EnemyDefinition` separates kind, variant, shape and fixed balance. Each `Enemy` creates its own `EnemyBehavior` and `Durability`; pursuit, deployment, missile charging, rotating formations, regenerating shields, and independent part health are separate implementations. Warder ownership and aura eligibility are resolved by CombatWorld for every damage source.
 - `MainWeapon` is the targeting/update contract; `RepeaterDefinition` and `ProjectileDefinition` hold its balance. Weapons emit `WeaponAction` commands; the world resolves those commands. `CombatSession` supplies `WeaponRuntimeModifiers` derived from the shared reading-character streak and Word Rush tracker. A future weapon can opt into the applicable modifiers without duplicating input matching. A future beam or area effect adds a command/handler without changing input transport or the activity.
-- `EnemySpawnDensity` makes a randomized one-enemy arrival decision from a smoothly varying rate. `EnemySpawnPolicy` independently selects the definition; `DroneEnemySpawnPolicy` chooses a tier and optional mutation. Neither decision belongs in the renderer or keyboard controller.
+- `EnemySpawnDensity` makes a randomized one-enemy arrival decision from a smoothly varying rate. `EnemySpawnPolicy` independently selects the definition; `MixedEnemySpawnPolicy` chooses a species and family tier from source weights and class caps, while `DroneEnemySpawnPolicy` keeps Drone tiers and mutations independent. Neither decision belongs in the renderer or keyboard controller.
 - `WordDefinition.readingLength` is derived from the reading, and `WordLengthPolicy` selects a length before `CombatSession` chooses a word from that group. The length schedule does not depend on enemy type or weapon.
 - `CombatWorld` advances movement, scheduled shots, swept circle collisions, spawning, damage, XP and death effects. It has no Android or IME dependencies.
 - `CombatSession` connects world events to dynamic word targets and caption animations. Enemy lifetime and caption lifetime are independent.
@@ -47,13 +47,13 @@ The curated list contains 1,625 entries; every reading-length group has at least
 
 ## Random enemy arrivals and entry captions
 
-`EnemySpawnPolicy` chooses which definition appears; `EnemySpawnDensity` decides whether one enemy appears in the current simulation step. The arena starts empty and random arrivals are possible immediately. Each step can create at most one enemy. There are no groups, pulse intervals, or delayed first wave.
+`EnemySpawnPolicy` chooses which definition appears; `EnemySpawnDensity` decides whether one enemy appears in the current simulation step. The arena starts empty and random arrivals are possible immediately. Each density decision creates at most one arrival. Shooter missiles and already-existing Splitter parts use their owned lifecycle and the same population limit; they are not grouped arrival requests. There are no groups, pulse intervals, or delayed first wave.
 
-`RandomEnemySpawnDensity` samples an independent Poisson arrival chance each update: `1 - exp(-rate × dt)`. The rate starts at 0.45 enemies/second and moves smoothly between 0.8× and 1.2× over a 120-second density cycle. The player-level multiplier is `min(1 + 0.04 × (level - 1), 1.4)`. Each successful random decision creates one enemy while fewer than `CombatConfig.maxEnemiesAlive` (16 by default) are alive. There is no interval timer or multi-enemy request. Tests can explicitly disable arrivals through `CombatConfig.spawningEnabled`.
+`RandomEnemySpawnDensity` samples an independent Poisson arrival chance each update: `1 - exp(-rate × dt)`. The rate starts at 0.45 enemies/second and moves smoothly between 0.8× and 1.2× over a 120-second density cycle. The player-level multiplier is `min(1 + 0.04 × (level - 1), 1.4)`. Each successful random decision creates one enemy while fewer than `CombatConfig.maxEnemiesAlive` (16 by default) are alive, counting every Splitter part against the limit even before separation. There is no interval timer or multi-enemy request. Tests can explicitly disable arrivals through `CombatConfig.spawningEnabled`.
 
-The spawn rate and level multiplier are explicit, editable prototype tuning, not a recovered Glyphica formula. The current `Threat` value is a placeholder at zero and has no effect on spawn density.
+The spawn rate and level multiplier are explicit, editable prototype tuning, not a recovered Glyphica formula. Threat records the public demo threat budget. Its source-derived adaptive frame value controls species weights and class caps, while it does not multiply the independently tuned arrival density.
 
-Public sources only describe the original threat system at a high level. The [Glyphica wiki](https://alias.black/glyphica/wiki_english.html) says threat rises over a run, Endless compares it with a player-level adaptive value, and special/elite enemies have class caps. A [developer interview](https://redharegames.wordpress.com/2025/02/03/game-talk-glyphica/) confirms that a central threat formula changes difficulty and density and that enemy types can be controlled by time brackets, but it does not publish the formula or its conversion to spawn counts. This implementation therefore does not invent a Threat progression or claim to reproduce that formula.
+The official Web demo Spawner exposes time/level scaling, threat budget and class caps. These were verified on 2026-11-02 after the earlier Wiki-only research. See [EnemyKindsDesign.md](EnemyKindsDesign.md) for formulas and deliberate local differences, including smooth introductions and preserving the Drone boss gate.
 
 Enemies begin outside one of the four viewport edges, at least their effective radius plus 12dp beyond it. Each enemy has a numeric `size` multiplier; effective radius is the base radius × tier body scale × mutation scale. Collision, spawn margins, body geometry and hit feedback use that effective radius. Every Drone tier is circular, and `EnemyMarkerPattern` reproduces the seven visual motifs in the [official Wiki tier images](https://alias.black/glyphica/wiki_english.html). The center disk stays the same size: Tier 2 adds an outer ring, Tier 3 adds another, and Tier 4 fills the band between those two rings. Total radius grows from Tier 1 through Tier 3, then stays at the Tier 3 radius for Tiers 4–7. Tier 5 cuts a center hole about the size of the shared core disk; Tiers 6–7 add segmented and ringed segmentation details. These layout proportions follow the user's visual description rather than the Wiki image crop dimensions. Caption and health-bar positions follow the effective enemy radius, while font sizes and health-bar dimensions stay fixed. Caption placement is selected once from the spawn origin and follows the enemy without viewport clamping; upper-half spawns put the text below and health bar above, with the inverse for lower-half spawns.
 
@@ -111,7 +111,7 @@ The official [Update 12 announcement](https://steamcommunity.com/app/2400160/ann
 | Player HP | 300 | User's reference image; also appears in the official Wiki's health example |
 | Drone speed / base radius | 5.95 logical dp/s / 4.5dp | Prototype screen tuning; speed reduced to 70% of the previous 8.5dp/s. Enlarged uses 1.5× numeric size locally. |
 | Drone tier appearance | Center disk stays constant; body scale 1 / 2 / 2.83, then remains 2.83 through Tier 7 | Outer circles are added through Tier 3; later tiers alter fill and holes without increasing the Tier 3 outer radius. Proportions follow the user's visual description. |
-| Drone tier weights | Tier 1 only for 60s; Tier 2 ramps in over 600s or 20 levels; Tier 3+ unlock one tier per boss defeat | Center shifts 0.25 per progression step; exact source-game Threat formula and thresholds are unpublished. |
+| Drone tier weights | Tier 1 only for 60s; Tier 2 ramps in over 600s or 20 levels; Tier 3+ unlock one tier per boss defeat | Center shifts 0.25 per progression step; this deliberate local Drone gate differs from the public demo species/threat progression. |
 | Bullet speed / radius / shot interval | 520dp/s / 1.25dp / 120ms | Prototype screen tuning; public absolute values not verified |
 | Enemy count / spawn | Random single arrivals; 0.45/s base rate modulated 0.8×–1.2× over 120s; 16 alive maximum | Rate cloud, level multiplier, and cap are local tuning; there are no groups or interval timer. |
 | XP | 10 per kill; first threshold50, subsequent thresholds +20 | Prototype progression |

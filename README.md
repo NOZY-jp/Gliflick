@@ -2,7 +2,7 @@
 
 Android向けのタイピング・サバイバルゲームです。日本語のローマ字入力とかな入力に対応し、敵の言葉を入力すると武器が攻撃します。
 
-現在はリピーターのエンドレスモード、11種のサブ武器、レベルアップ選択と武器別の撃破進化を実装しています。開発中のプロジェクトです。
+現在はリピーターのエンドレスモード、ドローン・シールドドローン・シューター・ウォーダー・スプリッター、11種のサブ武器、レベルアップ選択と武器別の撃破進化を実装しています。開発中のプロジェクトです。
 
 ## ビルド
 
@@ -32,10 +32,10 @@ Debug APKは`app/build/outputs/apk/debug/app-debug.apk`に生成されます。A
 ## 構成と仕様
 
 - `app/src/main/java/`：Android画面、入力判定、戦闘シミュレーション、Canvas描画。
-- `app/src/main/res/raw/`：編集可能な武器・進化・装飾SVG。
+- `app/src/main/res/raw/`：編集可能な敵・武器・進化・装飾SVG。
 - `app/src/test/`：入力判定・戦闘・進化などの単体テスト。
 - `app/src/androidTest/`：端末・エミュレーター上での操作・描画確認。
-- [戦闘設計](docs/EndlessCombatDesign.md)、[入力設計](docs/JapaneseInputDesign.md)、[レベルアップ](docs/LevelUpDesign.md)、[武器進化](docs/WeaponEvolutionDesign.md)。
+- [戦闘設計](docs/EndlessCombatDesign.md)、[敵の種類](docs/EnemyKindsDesign.md)、[入力設計](docs/JapaneseInputDesign.md)、[レベルアップ](docs/LevelUpDesign.md)、[武器進化](docs/WeaponEvolutionDesign.md)。
 
 旧プロジェクト名は`TestGame`です。既存インストールを更新できるよう、Androidの`applicationId`とソースの名前空間は`jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame`を維持しています。過去の検証資料・画像には以前の名前や作業パスが残っています。
 

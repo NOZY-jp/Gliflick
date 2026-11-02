@@ -18,7 +18,7 @@ data class Vec2(val x: Float, val y: Float) {
     companion object { val ZERO = Vec2(0f, 0f) }
 }
 
-enum class EnemyKind { DRONE }
+enum class EnemyKind { DRONE, SHIELD_DRONE, SHOOTER, SHOOTER_MISSILE, WARDER, SPLITTER, SPLITTER_SHARD }
 enum class EnemyVariant { NORMAL }
 enum class EnemyShape(val sides: Int) {
     CIRCLE(0), TRIANGLE(3), SQUARE(4), PENTAGON(5), HEXAGON(6), HEPTAGON(7), OCTAGON(8)
@@ -54,7 +54,7 @@ data class EnemyMutation(
     }
 }
 
-/** Reserved difficulty value. Its progression and gameplay effect are intentionally undefined. */
+/** Public demo threat budget, separate from locally tuned arrival density. */
 data class Threat(val value: Double) {
     init { require(value >= 0.0 && value.isFinite()) }
     companion object { val NONE = Threat(0.0) }
@@ -74,15 +74,22 @@ data class EnemyDefinition(
     val behaviorFactory: () -> EnemyBehavior = { PursuePlayer() },
     val durabilityFactory: (Int) -> Durability = { HealthPool(it) },
     val tier: Int = 1,
-    val mutation: EnemyMutation = EnemyMutation.NONE
+    val mutation: EnemyMutation = EnemyMutation.NONE,
+    val maxShield: Int = 0,
+    val splitter: SplitterDefinition? = null,
+    val collisionRadius: Float = radius
 ) {
-    init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && radius > 0f && size > 0f && tier > 0) }
+    init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && maxShield >= 0 && collisionRadius > 0f && radius > 0f && size > 0f && tier > 0) }
 }
 
 /** Shielding or damage immunity can decorate this contract without changing collision resolution. */
 interface Durability {
     val hp: Int
     fun takeDamage(amount: Int)
+    fun takeDamageAt(amount: Int, part: Int) = takeDamage(amount)
+    val shield: Float get() = 0f
+    val maxShield: Int get() = 0
+    fun advance(dt: Float) = Unit
 }
 
 class HealthPool(maxHp: Int) : Durability {
@@ -95,6 +102,8 @@ class HealthPool(maxHp: Int) : Durability {
 /** Per-instance behavior can keep its own timers; definitions never share mutable behavior state. */
 fun interface EnemyBehavior {
     fun update(enemy: Enemy, dt: Float, playerPosition: Vec2)
+    fun drainActions(): List<EnemyAction> = emptyList()
+    val activationProgress: Float get() = 1f
 }
 
 class PursuePlayer : EnemyBehavior {
@@ -113,6 +122,31 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
     private val durability = definition.durabilityFactory(definition.maxHp)
     var previousPosition = position
     val hp get() = durability.hp
+    val shield get() = durability.shield
+    val maxShield get() = durability.maxShield
+    val splitterHealth get() = durability as? SplitterHealth
+    val releasedPartIds = mutableMapOf<Int, Long>()
+    val populationCost get() = definition.splitter?.partCount ?: 1
+    var angle = 0f
+    var previousAngle = 0f
+    var deploymentPosition: Vec2? = null
+    var initialAttackDelay = 1.5f
+    var parentId: Long? = null
+    var flightDirection = Vec2.ZERO
+    var releaseOffset = Vec2.ZERO
+    val activationProgress get() = behavior.activationProgress
+    val aimPosition get() = if (definition.splitter == null) position else hitCircles().firstOrNull {
+        (splitterHealth?.partHealth?.get(it.part) ?: 0) > 0 }?.position ?: position
+    fun drainActions() = behavior.drainActions()
+    fun hitCircles(): List<EnemyHitCircle> {
+        val group = definition.splitter ?: return listOf(EnemyHitCircle(0, position, previousPosition, definition.collisionRadius * size))
+        return List(group.partCount) { part ->
+            val phase = part * 2f * PI.toFloat() / group.partCount
+            val now = Vec2(cos(angle + phase), sin(angle + phase)) * group.orbitRadius
+            val before = Vec2(cos(previousAngle + phase), sin(previousAngle + phase)) * group.orbitRadius
+            EnemyHitCircle(part, position + now, previousPosition + before, group.partRadius)
+        }
+    }
     var deathAge: Float? = null
         internal set
     val isAlive get() = hp > 0 && deathAge == null
@@ -120,14 +154,16 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
     val statuses = mutableListOf<EnemyStatus>()
     fun advance(dt: Float, destination: Vec2) {
         previousPosition = position
+        previousAngle = angle
+        durability.advance(dt)
         if (frozenSeconds > 0f) { frozenSeconds = (frozenSeconds - dt).coerceAtLeast(0f); return }
         val slow = if (statuses.any { it.type == DamageType.CHEMICAL && it.remaining > 0f }) 0.6f else 1f
         if (isAlive) behavior.update(this, dt * slow, destination)
     }
-    fun takeDamage(damage: Int): Int {
-        val hpBefore = hp
-        durability.takeDamage(damage)
-        return (hpBefore - hp).coerceAtLeast(0)
+    fun takeDamage(damage: Int, part: Int = 0): Int {
+        val before = hp + shield
+        durability.takeDamageAt(damage, part)
+        return (before - hp - shield).roundToInt().coerceAtLeast(0)
     }
 }
 
@@ -159,6 +195,7 @@ class Projectile(
     }
     var previousPosition = position
     val hitEnemyIds = mutableSetOf<Long>()
+    val hitPartKeys = mutableSetOf<Pair<Long, Int>>()
     var hasRicocheted = false
     var age = 0f
         private set

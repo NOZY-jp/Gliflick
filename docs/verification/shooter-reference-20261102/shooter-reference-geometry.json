@@ -1,0 +1,72 @@
+[
+  {
+    "tier": 1,
+    "source_url": "https://alias.black/glyphica/img/Shooter.png",
+    "sha256": "d1fefe24994339f3424fd5f81f7be1043cca9095977a954ca8795030da068690",
+    "origin_px": [
+      88.359375,
+      122.5
+    ],
+    "forward_radians": -0.31407450139413756,
+    "units_per_pixel": 1.0592104731504304,
+    "radius_units": 22.501,
+    "component_count": 1,
+    "vertices": 6
+  },
+  {
+    "tier": 2,
+    "source_url": "https://alias.black/glyphica/img/Shooter2.png",
+    "sha256": "96cbc77ffea20e2ba45d43983de27f7c9d0e28cb605e43dc91c6093b892a2b31",
+    "origin_px": [
+      97.3125,
+      123.046875
+    ],
+    "forward_radians": 2.6166963288982954,
+    "units_per_pixel": 1.0596439575893775,
+    "radius_units": 36.202,
+    "component_count": 2,
+    "vertices": 23
+  },
+  {
+    "tier": 3,
+    "source_url": "https://alias.black/glyphica/img/Shooter3.png",
+    "sha256": "44933ec0d1a4165d25d062264d1aa87f01aed3c3154b366df1ae1000bda612fb",
+    "origin_px": [
+      102.828125,
+      121.59375
+    ],
+    "forward_radians": -2.715864602566114,
+    "units_per_pixel": 1.0433279214447435,
+    "radius_units": 47.951,
+    "component_count": 3,
+    "vertices": 25
+  },
+  {
+    "tier": 4,
+    "source_url": "https://alias.black/glyphica/img/Shooter4.png",
+    "sha256": "da7767adc383e2c10392ee8fc8cbeaefadcbe09f009c33652446f84af46ceb28",
+    "origin_px": [
+      105.5625,
+      114.078125
+    ],
+    "forward_radians": 3.1083770262375774,
+    "units_per_pixel": 1.012099658417395,
+    "radius_units": 51.151,
+    "component_count": 3,
+    "vertices": 44
+  },
+  {
+    "tier": 5,
+    "source_url": "https://alias.black/glyphica/img/Shooter5.png",
+    "sha256": "c04edd69aa38a03125a1c00a8711c20ada5bff83fad36942fd53b785c8268a54",
+    "origin_px": [
+      80.234375,
+      113.65625
+    ],
+    "forward_radians": -0.4957794033942158,
+    "units_per_pixel": 1.0216748914384686,
+    "radius_units": 52.274,
+    "component_count": 2,
+    "vertices": 27
+  }
+]

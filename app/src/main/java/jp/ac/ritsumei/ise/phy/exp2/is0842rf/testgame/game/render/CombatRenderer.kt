@@ -28,6 +28,7 @@ import kotlin.math.min
 
 /** Presentation only: no matching, damage, spawning, or weapon timing. Coordinates are logical dp. */
 class CombatRenderer(context: Context) {
+    private val enemyRenderer = EnemyRenderer(context)
     private val secondaryRenderer = SecondaryWeaponRenderer(context)
     private val upgradeRenderer = UpgradeRenderer(context)
     private val gridBackground = GridBackgroundRenderer(context)
@@ -68,6 +69,7 @@ class CombatRenderer(context: Context) {
                 canvas.restore()
             }
         } }
+        enemyRenderer.drawProtection(canvas, world)
         world.enemies.forEach { enemy ->
             val alpha = (255f * (1f - (enemy.deathAge ?: 0f) / CombatWorld.DEATH_FADE_SECONDS)
                 .coerceIn(0f, 1f)).toInt()
@@ -76,6 +78,7 @@ class CombatRenderer(context: Context) {
             drawEnemyBody(canvas, enemy)
             drawEnemyHealthBar(canvas, enemy, alpha, enemy.spawnOrigin.y < world.height / 2f)
         }
+        enemyRenderer.drawBarriers(canvas, world)
         world.hitFeedback.forEach { drawHitGeometry(canvas, it) }
         world.projectiles.forEach { bullet ->
             if (secondaryRenderer.drawProjectile(canvas, bullet)) return@forEach
@@ -181,24 +184,29 @@ class CombatRenderer(context: Context) {
     }
 
     private fun drawEnemyHealthBar(canvas: Canvas, enemy: Enemy, alpha: Int, aboveEnemy: Boolean) {
-        if (enemy.hp >= enemy.definition.maxHp) return
-        val width = max(12f, enemy.definition.radius * 2.6f) * 2f
+        val parts = enemy.splitterHealth?.partHealth
+        if (enemy.hp >= enemy.definition.maxHp && enemy.shield >= enemy.maxShield) return
+        val fractions = if (parts != null) parts.map { it.toFloat() / enemy.definition.splitter!!.partHp }
+            else if (enemy.maxShield > 0) listOf(enemy.shield / enemy.maxShield, enemy.hp.toFloat() / enemy.definition.maxHp)
+            else listOf(enemy.hp.toFloat() / enemy.definition.maxHp)
+        val width = 24f
         val left = enemy.position.x - width / 2f
-        val barHeight = 1.5f
-        val gap = 8f
-        val top = if (aboveEnemy) enemy.position.y - enemy.radius - gap - barHeight
-        else enemy.position.y + enemy.radius + gap
+        val blockHeight = fractions.size * 3.5f - 2f
+        val top = if (aboveEnemy) enemy.position.y - enemy.radius - 8f - blockHeight
+            else enemy.position.y + enemy.radius + 8f
         paint.style = Paint.Style.FILL
-        paint.alpha = alpha
-        paint.color = Color.rgb(199, 199, 199)
-        canvas.drawRect(left, top, left + width, top + barHeight, paint)
-        paint.color = Color.rgb(117, 117, 117)
-        val hpFraction = (enemy.hp.toFloat() / enemy.definition.maxHp).coerceIn(0f, 1f)
-        canvas.drawRect(left, top, left + width * hpFraction, top + barHeight, paint)
+        fractions.forEachIndexed { row, fraction ->
+            val y = top + row * 3.5f
+            paint.color = Color.rgb(199, 199, 199); paint.alpha = alpha
+            canvas.drawRect(left, y, left + width, y + 1.5f, paint)
+            paint.color = Color.rgb(117, 117, 117); paint.alpha = alpha
+            canvas.drawRect(left, y, left + width * fraction.coerceIn(0f, 1f), y + 1.5f, paint)
+        }
         paint.alpha = 255
     }
 
     private fun drawEnemyBody(canvas: Canvas, enemy: Enemy) {
+        if (enemyRenderer.drawBody(canvas, enemy, paint.color)) return
         val centerX = enemy.position.x
         val centerY = enemy.position.y
         val radius = enemy.radius

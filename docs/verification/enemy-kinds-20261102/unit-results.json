@@ -1,0 +1,84 @@
+{
+  "tests": 160,
+  "failures": 0,
+  "errors": 0,
+  "suites": [
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.ExampleUnitTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.252"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.CaptionOverlapPolicyTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.276"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.CombatTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "time": "2.278"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.EnemyKindsTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "time": "1.381"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.LevelUpTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.659"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.MistypeStreakTest",
+      "tests": "22",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.656"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.SecondaryWeaponMotionTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.009"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.WeaponActivationRulesTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.004"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.WeaponEvolutionTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.092"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.WordMatchingTest",
+      "tests": "46",
+      "failures": "0",
+      "errors": "0",
+      "time": "0.109"
+    },
+    {
+      "name": "jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.MenuCommandTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "time": "1.491"
+    }
+  ]
+}
