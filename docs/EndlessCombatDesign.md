@@ -121,3 +121,9 @@ The default HP80 / damage35 requires three ordinary hits. A test injects damage4
 ## Verification
 
 Pure Kotlin tests cover straight flight, three shots surviving target death, interception, swept collision, XP, particles and retiring captions including composing input. Existing recognition tests protect the shared IME/streak behaviour. Build and physical-device UI smoke checks cover navigation, HUD and typing-to-shoot. Visual checks do not substitute for new human IME evidence.
+
+## 重なる文字の優先描画（2026-11-02）
+
+CaptionOverlapPolicyは、入力中 → 失ったHPの割合が大きい → ティアが高い → 内部の数値IDが小さい、の辞書順で比較する。低優先を先に描き、高優先を最後に描く。優先語と読み／正式表記の描画領域が重なる低優先の2行組は無彩色化し、不透明度を通常の32%にする。既に無彩色の読みも薄くなり区別できる。文字サイズ・入力候補・ダメージ処理は変えない。
+
+領域は描画と同じフォント・各文字のadvance・行ベースライン・完成時の中心固定拡大から算出し、画面内の可視部分だけで判定する。2行の隙間を一つの矩形で埋めない。同一敵の完成語と次の語のクロスフェードは相互に抑制せず、元の描画順を保つ。敵への参照をcaptionが保持し、死後の入力中ラベルも元のHP・ティア・IDを参照できる。

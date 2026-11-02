@@ -86,7 +86,6 @@ class CombatView(context: Context, private val definitions: List<WordDefinition>
                 val layout = UpgradeLayout(width / unit, height / unit, selection.offers.size)
                 val x = event.x / unit; val y = event.y / unit
                 if (layout.reroll.contains(x, y)) session.rerollUpgrades()
-                else layout.hitChoice(x, y)?.let(session::tapUpgrade)
                 syncInputBoundary()
             }
             performClick()

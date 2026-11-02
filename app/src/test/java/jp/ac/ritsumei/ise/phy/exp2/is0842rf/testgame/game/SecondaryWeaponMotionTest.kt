@@ -21,15 +21,21 @@ class SecondaryWeaponMotionTest {
         assertEquals("Enemies beyond the enlarged field must remain untouched", 1000, outside.hp)
     }
 
-    @Test fun spectreLeavesPlayerReachesRemoteEnemyAndKeepsFlying() {
+    @Test fun spectreStartsAtTypedEnemyAndKeepsFlying() {
         val world = world()
         val target = world.spawnEnemy(Vec2(330f, 250f), EnemyDefinition(maxHp = 100000, speed = 0f))
         world.acquireWeapon(WeaponId.SPECTRE)
         world.completeWord(WordDefinition("spectre-trigger", "a", languageTag = "en"), target.id)
         val drone = world.weaponActors.single { it.source == WeaponId.SPECTRE }
         val start = drone.position
-        repeat(120) { world.update(1f / 120f) }
-        assertTrue("Melee drones must move out of the centre", (drone.position - start).length() > 60f)
+        assertEquals(target.position, start)
+        var travelled = 0f
+        repeat(120) {
+            val before = drone.position
+            world.update(1f / 120f)
+            travelled += (drone.position - before).length()
+        }
+        assertTrue("Melee drones must keep flying, even when circling their spawn target", travelled > 60f)
         assertTrue(drone.trail.distinct().size >= 10)
         repeat(140) { world.update(1f / 120f) }
         assertTrue("The drone itself must damage the distant enemy", world.dps(WeaponId.SPECTRE) > 0f)
@@ -38,20 +44,22 @@ class SecondaryWeaponMotionTest {
         assertTrue("Spectre must keep a visible flying trail after contact", (drone.position - afterHit).length() > 10f)
     }
 
-    @Test fun hunterMovesIntoRangeAndFiresFromTriangleTip() {
+    @Test fun hunterStartsAtTypedEnemyThenPursuesFromItsOwnPosition() {
         val world = world()
         val target = world.spawnEnemy(Vec2(330f, 250f), EnemyDefinition(maxHp = 100000, speed = 0f))
         world.acquireWeapon(WeaponId.HUNTER)
         world.completeWord(WordDefinition("hunter-trigger", "i", languageTag = "en"), target.id)
-        val drone = world.weaponActors.single()
-        val start = drone.position
+        val drone = world.weaponActors.single() as HunterActor
+        assertEquals(target.position, drone.position)
+        repeat(40) { world.update(1f / 120f) }
+        assertTrue((drone.position - target.position).length() <= 28.01f)
+        target.position = Vec2(40f, 250f)
         var beamSeen = false
-        repeat(240) {
+        repeat(480) {
             world.update(1f / 120f)
-            beamSeen = beamSeen || world.weaponEffects.any { it.source == WeaponId.HUNTER }
+            beamSeen = beamSeen || drone.beams.isNotEmpty()
         }
-        assertTrue((drone.position - start).length() > 60f)
-        assertEquals(drone.range * 0.6f, (target.position - drone.position).length(), 0.1f)
+        assertEquals(drone.range, (target.position - drone.position).length(), 0.1f)
         assertTrue(world.dps(WeaponId.HUNTER) > 0f)
         assertTrue(beamSeen)
     }

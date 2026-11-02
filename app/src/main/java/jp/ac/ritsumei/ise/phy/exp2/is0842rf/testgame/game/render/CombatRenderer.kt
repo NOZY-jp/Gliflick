@@ -92,16 +92,7 @@ class CombatRenderer(context: Context) {
             canvas.drawCircle(bullet.position.x, bullet.position.y, bullet.radius, paint)
         }
         drawPlayer(canvas, world)
-        session.captions.forEach {
-            drawCaption(canvas, it.state, it.anchor, it.alpha, 1f, width, it.placeBelowEnemy, it.radius)
-        }
-        session.completions.forEach {
-            val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
-            drawCaption(canvas, it.state, it.anchor, 1f - eased, 1f + eased, width, it.placeBelowEnemy, it.radius)
-        }
-        session.pickupCaptions.forEach {
-            drawCaption(canvas, it.state, it.pickup.position, 1f, 1f, width, false, 9f)
-        }
+        drawCaptions(canvas, session, width, height)
         drawPendingRewardPrompt(canvas, session)
         world.hitFeedback.forEach { drawDamageNumber(canvas, it) }
         drawHud(canvas, world, width)
@@ -383,42 +374,94 @@ class CombatRenderer(context: Context) {
         canvas.drawRect(left, top, left + width * progress.coerceIn(0f, 1f), top + 1.25f, paint)
     }
 
-    private fun drawCaption(canvas: Canvas, state: WordMatchState, anchor: Vec2, alpha: Float,
-                            scale: Float, arenaWidth: Float, placeBelowEnemy: Boolean, enemyRadius: Float) {
-        if (alpha <= 0f) return
+    private data class CaptionGeometry(val centerX: Float, val centerY: Float,
+        val wordSize: Float, val labelSize: Float, val wordWidth: Float, val wordBaseline: Float,
+        val scale: Float, val boxes: List<CaptionTextBox>)
+    private data class CaptionDraw(val state: WordMatchState, val alpha: Float, val geometry: CaptionGeometry)
+
+    private fun drawCaptions(canvas: Canvas, session: CombatSession, width: Float, height: Float) {
+        val layers = mutableListOf<CaptionLayer<CaptionDraw>>()
+        fun add(state: WordMatchState, anchor: Vec2, alpha: Float, scale: Float,
+                below: Boolean, radius: Float, owner: Long, enemy: Enemy?) {
+            if (alpha <= 0f) return
+            val geometry = captionGeometry(state, anchor, scale, width, height, below, radius)
+            val priority = CaptionPriority(!state.isCompleted && state.matchedInputCharacters > 0,
+                enemy?.let { (it.definition.maxHp - it.hp).toDouble() / it.definition.maxHp } ?: 0.0,
+                enemy?.definition?.tier ?: 0, enemy?.id ?: if (owner > 0) owner else -owner)
+            layers += CaptionLayer(owner, priority, geometry.boxes, CaptionDraw(state, alpha, geometry))
+        }
+        session.captions.forEach {
+            add(it.state, it.anchor, it.alpha, 1f, it.placeBelowEnemy, it.radius, it.enemyId, it.enemy)
+        }
+        session.completions.forEach {
+            val eased = 0.5f - cos(it.progress * PI.toFloat()) * 0.5f
+            add(it.state, it.anchor, 1f - eased, 1f + eased, it.placeBelowEnemy, it.radius,
+                it.enemy?.id ?: Long.MAX_VALUE, it.enemy)
+        }
+        session.pickupCaptions.forEach {
+            add(it.state, it.pickup.position, 1f, 1f, false, 9f, -it.pickup.id, null)
+        }
+        CaptionOverlapPolicy.arrange(layers).forEach { drawCaption(canvas, it.layer.content, it.subdued) }
+    }
+
+    private fun captionGeometry(state: WordMatchState, anchor: Vec2, scale: Float,
+                                width: Float, height: Float, below: Boolean, radius: Float): CaptionGeometry {
+        val characters = splitTextCharacters(state.inputText)
         paint.typeface = light
-        paint.textAlign = Paint.Align.LEFT
         paint.textSize = 17f
-        val maxWidth = min(210f, arenaWidth - 20f)
-        val naturalWidth = paint.measureText(state.inputText).coerceAtLeast(1f)
+        val maxWidth = min(210f, width - 20f)
+        val naturalWidth = characters.sumOf { paint.measureText(it).toDouble() }.toFloat().coerceAtLeast(1f)
         if (naturalWidth > maxWidth) paint.textSize *= maxWidth / naturalWidth
-        val wordTextSize = paint.textSize
-        val textWidth = paint.measureText(state.inputText)
-        val centerX = anchor.x
+        val wordSize = paint.textSize
+        val wordWidth = characters.sumOf { paint.measureText(it).toDouble() }.toFloat()
+        val centerY = anchor.y + if (below) radius + 29.5f else -(radius + 17.5f)
+        val metrics = paint.fontMetrics
+        val baseline = centerY - (metrics.ascent + metrics.descent) / 2f
+        val reading = CaptionTextBox(anchor.x - wordWidth / 2f, baseline + metrics.ascent,
+            anchor.x + wordWidth / 2f, baseline + metrics.descent)
         paint.textSize = 10.5f
-        val labelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
-        if (labelWidth > maxWidth) paint.textSize *= maxWidth / labelWidth
-        val wordOffset = if (placeBelowEnemy) enemyRadius + 29.5f else -(enemyRadius + 17.5f)
-        val centerY = anchor.y + wordOffset
+        val naturalLabelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
+        if (naturalLabelWidth > maxWidth) paint.textSize *= maxWidth / naturalLabelWidth
+        val labelSize = paint.textSize
+        val labelWidth = paint.measureText(state.definition.displayName)
+        val label = CaptionTextBox(anchor.x - labelWidth / 2f, centerY - 16f + paint.fontMetrics.ascent,
+            anchor.x + labelWidth / 2f, centerY - 16f + paint.fontMetrics.descent)
+        val boxes = listOf(reading, label).mapNotNull { box ->
+            val left = max(0f, anchor.x + (box.left - anchor.x) * scale)
+            val right = min(width, anchor.x + (box.right - anchor.x) * scale)
+            val top = max(0f, centerY + (box.top - centerY) * scale)
+            val bottom = min(height, centerY + (box.bottom - centerY) * scale)
+            if (left < right && top < bottom) CaptionTextBox(left, top, right, bottom) else null
+        }
+        return CaptionGeometry(anchor.x, centerY, wordSize, labelSize, wordWidth, baseline, scale, boxes)
+    }
+
+    private fun drawCaption(canvas: Canvas, caption: CaptionDraw, subdued: Boolean) {
+        val state = caption.state
+        val geometry = caption.geometry
+        fun color(value: Int): Int {
+            if (!subdued) return value
+            val gray = (0.2126f * Color.red(value) + 0.7152f * Color.green(value) + 0.0722f * Color.blue(value)).toInt()
+            return Color.rgb(gray, gray, gray)
+        }
+        val alpha = (255f * caption.alpha * if (subdued) 0.32f else 1f).toInt().coerceIn(0, 255)
         canvas.save()
-        canvas.scale(scale, scale, centerX, centerY)
-        paint.textSize = wordTextSize
+        canvas.scale(geometry.scale, geometry.scale, geometry.centerX, geometry.centerY)
+        paint.typeface = light
+        paint.textSize = geometry.wordSize
         paint.textAlign = Paint.Align.LEFT
-        val baseline = centerY - (paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f
-        var x = centerX - textWidth / 2f
+        var x = geometry.centerX - geometry.wordWidth / 2f
         splitTextCharacters(state.inputText).forEachIndexed { index, character ->
-            paint.color = if (state.isCompleted || index < state.matchedInputCharacters) ink else idle
-            paint.alpha = (255f * alpha).toInt().coerceIn(0, 255)
-            canvas.drawText(character, x, baseline, paint)
+            paint.color = color(if (state.isCompleted || index < state.matchedInputCharacters) ink else idle)
+            paint.alpha = alpha
+            canvas.drawText(character, x, geometry.wordBaseline, paint)
             x += paint.measureText(character)
         }
-        paint.textSize = 10.5f
-        val fittedLabelWidth = paint.measureText(state.definition.displayName).coerceAtLeast(1f)
-        if (fittedLabelWidth > maxWidth) paint.textSize *= maxWidth / fittedLabelWidth
+        paint.textSize = geometry.labelSize
         paint.textAlign = Paint.Align.CENTER
-        paint.color = muted
-        paint.alpha = (255f * alpha).toInt().coerceIn(0, 255)
-        canvas.drawText(state.definition.displayName, centerX, centerY - 16f, paint)
+        paint.color = color(muted)
+        paint.alpha = alpha
+        canvas.drawText(state.definition.displayName, geometry.centerX, geometry.centerY - 16f, paint)
         canvas.restore()
         paint.alpha = 255
     }

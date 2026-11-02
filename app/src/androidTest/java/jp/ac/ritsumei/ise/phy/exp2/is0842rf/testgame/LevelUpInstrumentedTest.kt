@@ -36,7 +36,7 @@ class LevelUpInstrumentedTest {
         SystemClock.sleep(220)
     }
 
-    @Test fun phoneLevelUpPausesAndCardTapAppliesOneReward() {
+    @Test fun phoneLevelUpIgnoresCardTapAndTypingAppliesOneReward() {
         val activity = launch()
         try {
             reward(activity)
@@ -53,6 +53,13 @@ class LevelUpInstrumentedTest {
                 assertEquals(pausedAt, activity.findViewById<CombatView>(R.id.combatArena).session.world.elapsedSeconds, 0.0001)
             }
             tapBox(activity, choice = 0)
+            SystemClock.sleep(450)
+            instrumentation.runOnMainSync {
+                val selection = activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection!!
+                assertNull(selection.selectedIndex)
+                assertTrue(selection.states.all { it.matchedInputCharacters == 0 })
+            }
+            typeChoice(activity)
             waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection == null }
             instrumentation.runOnMainSync {
                 val world = activity.findViewById<CombatView>(R.id.combatArena).session.world
@@ -131,12 +138,28 @@ class LevelUpInstrumentedTest {
             waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection?.evolution == true }
             capture(activity, "evolution-phone.png")
             tapBox(activity, choice = 0)
+            SystemClock.sleep(450)
+            instrumentation.runOnMainSync {
+                val selection = activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection!!
+                assertNull(selection.selectedIndex)
+                assertTrue(selection.states.all { it.matchedInputCharacters == 0 })
+            }
+            typeChoice(activity)
             waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection == null }
             instrumentation.runOnMainSync {
                 val state = (activity.findViewById<CombatView>(R.id.combatArena).session.world.mainWeapon as Repeater).upgrades
                 assertEquals(1, state.evolutionsChosen)
             }
         } finally { instrumentation.runOnMainSync { activity.finish() } }
+    }
+
+    private fun typeChoice(activity: CombatActivity) {
+        instrumentation.runOnMainSync {
+            val word = activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection!!.words[0]
+            val roman = TypingLanguages.forTag(word.languageTag).defaultRoman(word.characters)
+            activity.findViewById<GameImeEditText>(R.id.combatInputHost)
+                .onCreateInputConnection(EditorInfo())!!.setComposingText(roman, 1)
+        }
     }
 
     private fun tapBox(activity: CombatActivity, choice: Int = 0, reroll: Boolean = false) {

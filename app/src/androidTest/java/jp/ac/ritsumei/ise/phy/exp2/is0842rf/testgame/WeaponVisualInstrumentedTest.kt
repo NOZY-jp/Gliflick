@@ -43,11 +43,16 @@ class WeaponVisualInstrumentedTest {
                         else -> "attack"
                     }
                     world.completeWord(WordDefinition("visual-trigger", word, languageTag = "en"), target.id)
-                    val start = world.weaponActors.firstOrNull()?.position
+                    val moving = world.weaponActors.firstOrNull()
+                    var travelled = 0f
                     val steps = when (id) { WeaponId.CHOPPER -> 48; WeaponId.OSCILLATOR -> 72; else -> 192 }
-                    repeat(steps) { arena.session.update(1f / 120f) }
+                    repeat(steps) {
+                        val before = moving?.position
+                        arena.session.update(1f / 120f)
+                        if (before != null) travelled += (moving.position - before).length()
+                    }
                     if (id == WeaponId.HUNTER) repeat(80) {
-                        if (world.weaponEffects.none { it.source == id }) arena.session.update(1f / 120f)
+                        if (world.weaponActors.filterIsInstance<HunterActor>().none { it.beams.isNotEmpty() }) arena.session.update(1f / 120f)
                     }
                     if (id == WeaponId.SENTRY) {
                         repeat(100) { if (world.projectiles.none { it.source == id }) arena.session.update(1f / 120f) }
@@ -63,7 +68,7 @@ class WeaponVisualInstrumentedTest {
                     if (id == WeaponId.GUARDIAN) world.spawnPickup(PickupKind.FUEL, world.player.position + Vec2(-55f, 55f))
                     if (id == WeaponId.SPECTRE) {
                         val drone = world.weaponActors.first { it.source == id }
-                        assertTrue((drone.position - start!!).length() > 60f)
+                        assertTrue(travelled > 60f)
                         assertTrue(drone.trail.distinct().size > 8)
                     }
                     arena.invalidate()

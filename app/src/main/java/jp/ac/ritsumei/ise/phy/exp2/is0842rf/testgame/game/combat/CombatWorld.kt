@@ -202,8 +202,10 @@ class CombatWorld(
         point.y.coerceIn(margin.coerceAtMost(height / 2f), (height - margin).coerceAtLeast(height / 2f)))
     fun randomPoint(margin: Float) = clampPoint(Vec2(random.nextFloat() * width, random.nextFloat() * height), margin)
     fun launch(projectile: Projectile) { if (mutableProjectiles.size < 1024) mutableProjectiles += projectile }
-    fun addActor(actor: WeaponActor) {
-        if (mutableActors.count { it.source == actor.source } < 48 && mutableActors.size < 160) mutableActors += actor
+    fun addActor(actor: WeaponActor): Boolean {
+        if (mutableActors.count { it.source == actor.source } >= 48 || mutableActors.size >= 160) return false
+        mutableActors += actor
+        return true
     }
     fun addEffect(effect: WeaponEffect) { if (mutableEffects.size < 160) mutableEffects += effect }
     fun hasPickup(kind: PickupKind) = pickups.any { it.kind == kind }

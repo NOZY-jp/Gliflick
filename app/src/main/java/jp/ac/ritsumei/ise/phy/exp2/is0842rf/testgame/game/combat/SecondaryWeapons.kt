@@ -51,8 +51,6 @@ interface SecondaryWeapon {
 abstract class BaseSecondary(override val id: WeaponId) : SecondaryWeapon {
     final override val state = WeaponRunState(id)
     fun scale(stat: WeaponStat) = state.scale(stat)
-    fun deployment(world: CombatWorld, event: CompletedCombatWord): Vec2 =
-        world.clampPoint(world.player.position + (event.position - world.player.position) * 0.65f, 24f)
 }
 
 abstract class WeaponActor(
@@ -111,20 +109,17 @@ abstract class WeaponActor(
     }
 }
 
-class DroneActor(state: WeaponRunState, position: Vec2, private val ranged: Boolean, val enhanced: Boolean = false) : WeaponActor(
-    state, position, WeaponVisualKind.DRONE,
-    if (ranged) DamageType.ELECTRIC else DamageType.KINETIC,
-    7f * state.scale(WeaponStat.DURATION), 7f * state.scale(WeaponStat.DURATION),
-    if (ranged) 10f else 50f, if (ranged) 70f else 5f
+/** Spectre's continuously flying melee behavior is independent of Hunter targeting and cadence. */
+class DroneActor(state: WeaponRunState, position: Vec2, val enhanced: Boolean = false) : WeaponActor(
+    state, position, WeaponVisualKind.DRONE, DamageType.KINETIC,
+    7f * state.scale(WeaponStat.DURATION), 7f * state.scale(WeaponStat.DURATION), 50f, 5f
 ) {
     override val formScale get() = if (enhanced) 1.5f else 1f
     override val damageMultiplier get() = if (enhanced) 2f else 1f
     init { if (enhanced) remaining *= 1.5f }
-    private var fireCooldown = 0f
     private var targetId: Long? = null
     private var headingInitialized = false
     override fun update(world: CombatWorld, dt: Float) {
-        beamEnd = null
         advanceLifetime(dt)
         if (finished) {
             if (state.has(SELF_DESTRUCT)) {
@@ -139,47 +134,12 @@ class DroneActor(state: WeaponRunState, position: Vec2, private val ranged: Bool
         targetId = target.id
         val delta = target.position - position
         val desired = atan2(delta.y, delta.x)
-        val speed = 75f * state.scale(WeaponStat.SPEED) * formScale
         val previous = position
-        if (ranged) {
-            angle = desired
-            val distance = (delta.length() - range * 0.6f).coerceAtLeast(0f)
-            position += delta.normalized() * min(distance, speed * dt)
-        } else {
-            // Melee drones keep flying and turn back through the target; stopping erases their trail.
-            if (!headingInitialized) { angle = desired; headingInitialized = true }
-            val turn = atan2(sin(desired - angle), cos(desired - angle))
-            angle += turn.coerceIn(-6f * dt, 6f * dt)
-            position += Vec2(cos(angle), sin(angle)) * speed * dt
-        }
-        if (ranged) {
-            fireCooldown -= dt
-            if ((target.position - position).length() <= range && fireCooldown <= 0f) {
-                val muzzle = position + Vec2(cos(angle), sin(angle)) * 5f
-                if (state.has(ELECTRIFIED_BOLTS)) {
-                    world.launch(Projectile(muzzle, delta.normalized() * 320f, damage, 1.6f,
-                        source = source, damageType = type, ricochets = state.rank(CHAIN_LIGHTNING),
-                        ricochetDamageMultiplier = 1f))
-                } else {
-                    val visited = mutableSetOf<Long>()
-                    var victim: Enemy? = target
-                    var start = muzzle
-                    repeat(1 + state.rank(CHAIN_LIGHTNING)) {
-                        victim?.let { enemy ->
-                            visited += enemy.id
-                            world.addEffect(WeaponEffect(start, enemy.position, type, source = source))
-                            world.dealDamage(enemy.id, damage, source, type)
-                            start = enemy.position
-                            victim = world.enemies.filter { it.isAlive && it.id !in visited &&
-                                (it.position - start).length() <= range }.minByOrNull { (it.position - start).length() }
-                        }
-                    }
-                    beamEnd = target.position
-                }
-                fireCooldown += 0.3f /
-                    (state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
-            }
-        } else if (sweptCircleHit(previous - target.previousPosition,
+        if (!headingInitialized) { angle = desired; headingInitialized = true }
+        val turn = atan2(sin(desired - angle), cos(desired - angle))
+        angle += turn.coerceIn(-6f * dt, 6f * dt)
+        position += Vec2(cos(angle), sin(angle)) * (75f * state.scale(WeaponStat.SPEED) * formScale * dt)
+        if (sweptCircleHit(previous - target.previousPosition,
                 position - target.position, target.radius + 5f * formScale) != null) hit(world, target, 0.55f)
     }
 }
@@ -364,8 +324,8 @@ class SpectreWeapon : BaseSecondary(WeaponId.SPECTRE) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
         repeat(event.containsCount("aeo").coerceAtMost(8)) {
             if (state.has(SUPERCHARGED)) produced++
-            world.addActor(DroneActor(state, world.player.position + world.randomDirection() * 5f,
-                false, state.has(SUPERCHARGED) && produced % 20 == 0))
+            world.addActor(DroneActor(state, event.position,
+                state.has(SUPERCHARGED) && produced % 20 == 0))
         }
     }
 }
@@ -374,8 +334,9 @@ class HunterWeapon : BaseSecondary(WeaponId.HUNTER) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
         repeat(event.containsCount("iou").coerceAtMost(8)) {
             if (state.has(HUNTER_ELITE)) produced++
-            world.addActor(DroneActor(state, world.player.position + world.randomDirection() * 8f,
-                true, state.has(HUNTER_ELITE) && produced % 12 == 0))
+            val enhanced = state.has(HUNTER_ELITE) && produced % 12 == 0
+            world.addActor(HunterActor(state, event.position, enhanced,
+                world.randomDirection() * (if (enhanced) 45f else 28f)))
         }
     }
 }
@@ -388,18 +349,12 @@ class SentryWeapon : BaseSecondary(WeaponId.SENTRY) {
     }
 }
 class TeslaMineWeapon : BaseSecondary(WeaponId.TESLA_MINE) {
-    private var deploymentCooldown = 0f
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (deploymentCooldown <= 0f && event.startsWith(EvolutionEffects.triggerLetters(state, "bcde"))) {
-            world.addActor(FieldActor(state, deployment(world, event),
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, "bcde"))) {
+            world.addActor(FieldActor(state, event.position,
                 WeaponVisualKind.TESLA, 32f, 12f, 38f, DamageType.ELECTRIC).also { it.angle = world.randomAngle() })
-            deploymentCooldown = DEPLOYMENT_COOLDOWN_SECONDS
         }
     }
-    override fun update(world: CombatWorld, dt: Float) {
-        deploymentCooldown = (deploymentCooldown - dt).coerceAtLeast(0f)
-    }
-    companion object { private const val DEPLOYMENT_COOLDOWN_SECONDS = 5f }
 }
 class OscillatorWeapon : BaseSecondary(WeaponId.OSCILLATOR) {
     private var direction = Vec2(0f, -1f)
@@ -451,28 +406,34 @@ class MeteorWeapon : BaseSecondary(WeaponId.METEOR) {
     }
 }
 class ChopperWeapon : BaseSecondary(WeaponId.CHOPPER) {
+    // Each flight (including all saws in one volley) occupies one available Chopper slot.
+    private val flights = mutableListOf<List<MovingBladeActor>>()
     override fun onMainWeaponFire(world: CombatWorld, projectile: Projectile) {
+        flights.removeAll { flight -> flight.all { it.finished } }
+        if (flights.size >= 1 + state.rank(DUAL_WIELD)) return
         val direction = projectile.velocity.normalized()
         val heading = atan2(direction.y, direction.x)
         val saw = state.has(SAW_LAUNCHER)
         val count = if (saw) 2 * state.rank(SAW_LAUNCHER) else 1
-        repeat(1 + state.rank(DUAL_WIELD)) { group ->
+        val launched = buildList {
             repeat(count) { index ->
-                val angle = heading + group * 0.12f + if (saw) (index - (count - 1) / 2f) * 0.18f else 0f
-                world.addActor(MovingBladeActor(state, world.player.position,
-                    Vec2(cos(angle), sin(angle)) * (if (saw) 230f else 150f), saw))
+                val angle = heading + if (saw) (index - (count - 1) / 2f) * 0.18f else 0f
+                val actor = MovingBladeActor(state, world.player.position,
+                    Vec2(cos(angle), sin(angle)) * (if (saw) 230f else 150f), saw)
+                if (world.addActor(actor)) add(actor)
             }
         }
+        if (launched.isNotEmpty()) flights += launched
     }
 }
 class MinefieldWeapon : BaseSecondary(WeaponId.MINEFIELD) {
     private var recursiveCooldown = 12f
     private val count get() = 3 + state.bonus(WeaponStat.MINE_COUNT).toInt() + if (state.rank(HUNTER_SEEKER) == 2) 1 else 0
-    private fun spawn(world: CombatWorld, count: Int) { repeat(count) {
-        world.addActor(MineActor(state, world.player.position, world.randomDirection()))
+    private fun spawn(world: CombatWorld, count: Int, position: Vec2 = world.player.position) { repeat(count) {
+        world.addActor(MineActor(state, position, world.randomDirection()))
     } }
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith(EvolutionEffects.triggerLetters(state, "fghi"))) spawn(world, count)
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, "fghi"))) spawn(world, count, event.position)
     }
     override fun update(world: CombatWorld, dt: Float) {
         if (!state.has(RECURSIVE_MINES)) return
@@ -485,7 +446,7 @@ class MinefieldWeapon : BaseSecondary(WeaponId.MINEFIELD) {
 }
 class BladeTrapWeapon : BaseSecondary(WeaponId.BLADE_TRAP) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith(EvolutionEffects.triggerLetters(state, "jklm"))) world.addActor(FieldActor(state, deployment(world, event),
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, "jklm"))) world.addActor(FieldActor(state, event.position,
             WeaponVisualKind.BLADE, 10f, 5f, 28f, DamageType.KINETIC))
     }
 }

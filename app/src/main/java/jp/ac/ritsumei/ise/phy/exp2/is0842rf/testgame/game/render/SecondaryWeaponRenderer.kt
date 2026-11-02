@@ -45,10 +45,18 @@ class SecondaryWeaponRenderer(context: Context) {
                     }
                 }
                 WeaponId.HUNTER -> {
-                    if ((body as DroneActor).enhanced) {
+                    val hunter = body as HunterActor
+                    if (hunter.enhanced) {
                         canvas.save(); canvas.rotate(body.angle * 180f / PI.toFloat(), p.x, p.y)
                         icons.drawHunterElite(canvas, p.x, p.y, 13f, ink(190)); canvas.restore()
                     } else actor(canvas, body.source, p, 5f, body.angle)
+                    hunter.beams.forEach { beam ->
+                        if (beam.type == DamageType.ELECTRIC) drawLightning(canvas, beam)
+                        else {
+                            stroke(170)
+                            canvas.drawLine(beam.start.x, beam.start.y, beam.end.x, beam.end.y, paint)
+                        }
+                    }
                 }
                 WeaponId.SENTRY -> {
                     val muzzle = p + Vec2(cos(body.angle), sin(body.angle)) * (world.player.radius + 2f)

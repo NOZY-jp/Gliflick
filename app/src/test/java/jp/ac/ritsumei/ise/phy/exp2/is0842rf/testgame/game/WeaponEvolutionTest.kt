@@ -80,7 +80,7 @@ class WeaponEvolutionTest {
         assertTrue(s.rerollUpgrades())
         assertTrue(s.upgradeSelection!!.offers.all { it.weapon == WeaponId.SPECTRE })
         repeat(3) {
-            s.tapUpgrade(0); repeat(200) { s.update(0.01f) }
+            s.onInput(s.upgradeSelection!!.states[0].inputText.map { jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken.Stroke(it.toString()) }, false); repeat(200) { s.update(0.01f) }
             assertNull(s.upgradeSelection)
             assertTrue(s.handleSpace())
         }
@@ -124,11 +124,11 @@ class WeaponEvolutionTest {
             repeat(3) { weapon.onWord(w, event(glyph as String)) }
             w.evolve(branch as SecondaryEvolution)
             repeat(count as Int) { weapon.onWord(w, event(glyph as String)) }
-            val actors = w.weaponActors.filterIsInstance<DroneActor>()
-            assertEquals(1, actors.count { it.enhanced })
+            val actors = w.weaponActors
+            assertEquals(1, actors.count { if (it is HunterActor) it.enhanced else (it as DroneActor).enhanced })
             val elite = actors.last(); val normal = actors.first()
             assertEquals(normal.damage * 2, elite.damage)
-            assertEquals(10.5f, elite.remaining, 0.001f)
+            assertEquals(if (id == WeaponId.HUNTER) 8.75f else 10.5f, elite.remaining, 0.001f)
         }
     }
 
@@ -161,7 +161,7 @@ class WeaponEvolutionTest {
         w.evolve(ELECTRIFIED_BOLTS); w.evolve(CHAIN_LIGHTNING)
         val a = w.spawnEnemy(Vec2(270f, 250f), EnemyDefinition(maxHp = 1000, speed = 0f))
         val b = w.spawnEnemy(Vec2(295f, 250f), EnemyDefinition(maxHp = 1000, speed = 0f))
-        weapon.onWord(w, event("i")); repeat(30) { w.update(1f / 120f) }
+        weapon.onWord(w, event("i", a.position)); repeat(90) { w.update(1f / 120f) }
         assertTrue(a.hp < 1000); assertEquals(a.hp, b.hp)
     }
 

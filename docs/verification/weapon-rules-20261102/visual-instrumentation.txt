@@ -1,0 +1,8 @@
+
+jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.WeaponVisualInstrumentedTest:.
+
+Time: 59.453
+
+OK (1 test)
+
+

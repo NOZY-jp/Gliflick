@@ -48,7 +48,7 @@ class WeaponEvolutionInstrumentedTest {
                 instrumentation.runOnMainSync {
                     val arena = activity.findViewById<CombatView>(R.id.combatArena)
                     val time = arena.session.world.elapsedSeconds
-                    arena.session.tapUpgrade(0)
+                    arena.session.onInput(arena.session.upgradeSelection!!.states[0].inputText.map { jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken.Stroke(it.toString()) }, false)
                     repeat(300) { if (arena.session.upgradeSelection != null) arena.session.update(0.01f) }
                     assertNull(arena.session.upgradeSelection)
                     assertEquals(1, arena.session.world.weaponState(id)!!.evolutionsChosen)
@@ -95,12 +95,12 @@ class WeaponEvolutionInstrumentedTest {
                     val count = when (id) { WeaponId.SPECTRE -> 20; WeaponId.HUNTER -> 12; else -> 1 }
                     repeat(count) { weapon.onWord(world, CompletedCombatWord(
                         WordDefinition("evolved", glyph, languageTag = "en"), target.id, target.position)) }
-                    if (count > 1) world.weaponActors.filterIsInstance<DroneActor>().filter { !it.enhanced }.forEach { it.finished = true }
+                    if (count > 1) world.weaponActors.filter { if (it is HunterActor) !it.enhanced else it is DroneActor && !it.enhanced }.forEach { it.finished = true }
                     if (id == WeaponId.CHOPPER) weapon.onMainWeaponFire(world,
                         Projectile(world.player.position, Vec2(200f, -80f)))
                     repeat(if (id == WeaponId.CHOPPER) 35 else 120) { arena.session.update(1f / 120f) }
                     if (id == WeaponId.HUNTER) repeat(100) {
-                        if (world.weaponEffects.none { it.source == id }) arena.session.update(1f / 120f)
+                        if (world.weaponActors.filterIsInstance<HunterActor>().none { it.beams.isNotEmpty() }) arena.session.update(1f / 120f)
                     }
                     if (id == WeaponId.ORBITER) assertEquals(2, world.weaponActors.count { it.source == id })
                     arena.invalidate()
