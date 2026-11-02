@@ -3,6 +3,10 @@
 - Typing streak counts newly confirmed reading characters, not completed words or Roman key count. Small kana each count one. Shared input counts once: ちゃわんがん is 6, while ちゃわん + わんがん is 8. Keep these examples in regression tests.
 - Word completion preserves other words' partial progress. Shared-input effect hooks come from overlapping completion intervals, not merely two consecutive successes. See docs/MistypeDesign.md for the implemented scoring contract.
 
+## Android verification
+
+- Use a connected physical device for builds and runtime verification. Use an emulator only when no physical device is connected.
+
 ## Title UI
 
 - Read docs/TitleMenuDesign.md before changing the title menu. The Figma IME rectangle is a keyboard placeholder, not a product panel: the grid continues underneath it. Never render the IME label/grey rectangle as app UI.
@@ -11,7 +15,7 @@
 - The latest Figma frame is `14:97`; its grid comes from `app/src/main/res/drawable-nodpi/menu_grid.png`, regenerated with `docs/verification/render-menu-grid.py`. Background circles and squares remain native shapes, independently animated outward and faded away during completion; do not flatten those shapes into the grid PNG.
 - Tapping a menu command simulates one character every 50ms. Keep the four menu rows aligned at the Figma left edge and use their text lengths to form the rising/falling right edge.
 - Preserve the completed title transition frame while the destination is covering TitleActivity; resetting MenuBackdropView during the outgoing onPause can redraw shapes that already faded away. Reset the menu and backdrop after returning to the title.
-- Menu and gameplay share GameImeEditText and WordMatchEngine; menus only adapt static targets/navigation, and English belongs in TypingLanguage. Do not add a separate correctness algorithm or discard a failing character before considering it as a fresh word start. Keep armorarmory and continuously highlighted aaaaa in regression coverage. Instrumented notification replay is not human keyboard evidence.
+- Menu and gameplay share GameImeEditText and WordMatchEngine; menus only adapt static targets/navigation, and English belongs in TypingLanguage. Do not add a separate correctness algorithm or discard a failing character before considering it as a fresh word start. Current rows are start, coming soon..., keyboard test and quit. Exclude coming soon... from input and taps; quit closes the game task. Keep the current-label equivalents of typo recovery and continuously highlighted first letters in regression coverage; preserve literal-space input for keyboard test. Instrumented notification replay is not human keyboard evidence.
 
 ## Play scene
 

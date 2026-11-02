@@ -34,25 +34,29 @@ class TitleMenuView(context: Context) : FrameLayout(context) {
     val rows: Map<MenuCommand, TextView> = MenuCommand.entries.associateWith { command ->
         TextView(context).apply {
             id = when (command) {
-                MenuCommand.PLAY -> R.id.menuPlay
-                MenuCommand.ARMORY -> R.id.menuArmory
-                MenuCommand.UPGRADES -> R.id.menuUpgrades
-                MenuCommand.OPTIONS -> R.id.menuOptions
+                MenuCommand.START -> R.id.menuStart
+                MenuCommand.COMING_SOON -> R.id.menuComingSoon
+                MenuCommand.KEYBOARD_TEST -> R.id.menuKeyboardTest
+                MenuCommand.QUIT -> R.id.menuQuit
             }
             gravity = Gravity.CENTER_VERTICAL
             typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
             letterSpacing = 0.02f
             includeFontPadding = false
             setTextColor(untyped)
-            isFocusable = true
+            setSingleLine(true)
+            isEnabled = command.selectable
+            isFocusable = command.selectable
             val ripple = TypedValue()
             context.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
-            background = ContextCompat.getDrawable(context, ripple.resourceId)
-            setOnClickListener { onCommandClick?.invoke(command) }
+            if (command.selectable) {
+                background = ContextCompat.getDrawable(context, ripple.resourceId)
+                setOnClickListener { onCommandClick?.invoke(command) }
+            }
             accessibilityDelegate = object : AccessibilityDelegate() {
                 override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
                     super.onInitializeAccessibilityNodeInfo(host, info)
-                    info.className = "android.widget.Button"
+                    info.className = if (command.selectable) "android.widget.Button" else "android.widget.TextView"
                 }
             }
         }
@@ -89,7 +93,9 @@ class TitleMenuView(context: Context) : FrameLayout(context) {
     fun showInput(input: MenuInput) {
         rows.forEach { (command, row) ->
             val label = SpannableString("> ${command.text}")
-            label.setSpan(ForegroundColorSpan(ink), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (command.selectable) {
+                label.setSpan(ForegroundColorSpan(ink), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
             val matched = input.matchedCharacters(command)
             if (matched > 0) {
                 label.setSpan(ForegroundColorSpan(ink), 2, 2 + matched,
@@ -111,6 +117,13 @@ class TitleMenuView(context: Context) : FrameLayout(context) {
         rows.values.forEach { row ->
             // Long labels still fit at large accessibility font sizes.
             row.setTextSize(TypedValue.COMPLEX_UNIT_PX, 90f * unit * fontScale.coerceAtMost(1.5f))
+            row.measure(exact(768f * unit), exact(rowHeight))
+        }
+        // Keep a single common menu size, fitting the longest label without wrapping.
+        val widest = rows.values.maxOf { it.paint.measureText(it.text.toString()) }
+        val fit = if (widest > 0f) (768f * unit / widest).coerceAtMost(1f) else 1f
+        if (fit < 1f) rows.values.forEach { row ->
+            row.setTextSize(TypedValue.COMPLEX_UNIT_PX, row.textSize * fit)
             row.measure(exact(768f * unit), exact(rowHeight))
         }
         launchIme.setTextSize(TypedValue.COMPLEX_UNIT_PX, 90f * unit * fontScale.coerceAtMost(1.5f))

@@ -74,7 +74,7 @@ val WeaponId.family get() = when (this) {
 object EvolutionCatalog {
     val triggerBranches = setOf(SecondaryEvolution.ABUNDANT_COILS, SecondaryEvolution.MINELAYER,
         SecondaryEvolution.BLADE_REPOSITORY, SecondaryEvolution.CONTINUUM)
-    val extraLetterGroups = listOf("yz", "vw")
+    val extraLetterGroups = WeaponTriggerGlyphs.extraGroups
     fun branches(id: WeaponId): List<WeaponEvolution> = if (id == WeaponId.REPEATER)
         RepeaterEvolution.entries else SecondaryEvolution.entries.filter { it.weapon == id }
 

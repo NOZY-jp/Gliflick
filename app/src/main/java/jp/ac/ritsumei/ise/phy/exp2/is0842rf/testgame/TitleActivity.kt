@@ -78,7 +78,7 @@ class TitleActivity : AppCompatActivity() {
         setContentView(root)
 
         content.onCommandClick = { command ->
-            if (!selecting) startTap(command)
+            if (!selecting && command.selectable) startTap(command)
         }
         content.onLaunchImeClick = { requestMenuInput() }
         editor.onGameInput = { edit ->
@@ -93,6 +93,15 @@ class TitleActivity : AppCompatActivity() {
                 }
                 completed != null
             }
+        }
+        // Shared transport finishes any composition before invoking this callback.
+        // Menus use a literal space in "keyboard test"; combat retains its Space action.
+        editor.onSpacePressed = {
+            if (!selecting) {
+                menuInput = menuController.onInputTokens(listOf(InputToken.Stroke(" ")), false)
+                content.showInput(menuInput)
+            }
+            true
         }
         val restored = savedInstanceState?.getString("menu_prefix").orEmpty()
         if (restored.isNotEmpty()) {
@@ -193,8 +202,16 @@ class TitleActivity : AppCompatActivity() {
     }
 
     private fun navigate(command: MenuCommand) {
-        val destination = if (command == MenuCommand.PLAY) CombatActivity::class.java else MainActivity::class.java
         navigationInProgress = true
+        if (command == MenuCommand.QUIT) {
+            finishAndRemoveTask()
+            return
+        }
+        val destination = when (command) {
+            MenuCommand.START -> CombatActivity::class.java
+            MenuCommand.KEYBOARD_TEST -> MainActivity::class.java
+            else -> return
+        }
         startActivity(Intent(this, destination)
             .putExtra(MainActivity.EXTRA_MENU_COMMAND, command.text))
         @Suppress("DEPRECATION")

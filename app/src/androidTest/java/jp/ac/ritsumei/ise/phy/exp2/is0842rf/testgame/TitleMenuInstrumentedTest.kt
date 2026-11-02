@@ -51,26 +51,26 @@ class TitleMenuInstrumentedTest {
         instrumentation.removeMonitor(combatMonitor)
     }
 
-    @Test fun normalAndPlCompositionMatchTheFigmaStates() {
+    @Test fun normalAndStCompositionShowCurrentMenu() {
         capture("menu-default-pixel7a.png")
         instrumentation.runOnMainSync {
             val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
             val attributes = EditorInfo()
             val connection = editor.onCreateInputConnection(attributes)!!
             assertTrue(attributes.imeOptions and EditorInfo.IME_FLAG_FORCE_ASCII != 0)
-            connection.setComposingText("p", 1)
-            connection.setComposingText("pl", 1)
-            assertEquals(2, highlightedLetters(R.id.menuPlay))
-            assertEquals(0, highlightedLetters(R.id.menuArmory))
-            assertEquals(0, highlightedLetters(R.id.menuUpgrades))
-            assertEquals(0, highlightedLetters(R.id.menuOptions))
+            connection.setComposingText("s", 1)
+            connection.setComposingText("st", 1)
+            assertEquals(2, highlightedLetters(R.id.menuStart))
+            assertEquals(0, highlightedLetters(R.id.menuKeyboardTest))
+            assertEquals(0, highlightedLetters(R.id.menuComingSoon))
+            assertEquals(0, highlightedLetters(R.id.menuQuit))
         }
         assertEquals(0, monitor.hits)
-        capture("menu-pl-pixel7a.png")
+        capture("menu-st-pixel7a.png")
     }
 
-    @Test fun allFourTypedCommandsNavigateAndIdentifyTheirOrigin() {
-        for (command in listOf("play", "armory", "upgrades", "options")) {
+    @Test fun activeTypedCommandsNavigateAndIdentifyTheirOrigin() {
+        for (command in listOf("start", "keyboard test")) {
             instrumentation.runOnMainSync {
                 val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
                 editor.onCreateInputConnection(EditorInfo())!!.setComposingText(command, 1)
@@ -81,31 +81,30 @@ class TitleMenuInstrumentedTest {
     }
 
     @Test fun tapTypingShowsProgressAndIgnoresDuplicateSelection() {
-        instrumentation.runOnMainSync { title.findViewById<TextView>(R.id.menuOptions).performClick() }
-        waitUntil { highlightedLetters(R.id.menuOptions) == 1 }
+        instrumentation.runOnMainSync { title.findViewById<TextView>(R.id.menuKeyboardTest).performClick() }
+        waitUntil { highlightedLetters(R.id.menuKeyboardTest) in 1..3 }
         instrumentation.runOnMainSync {
-            assertEquals(1, highlightedLetters(R.id.menuOptions))
             assertEquals(0, monitor.hits)
-            title.findViewById<TextView>(R.id.menuArmory).performClick()
+            title.findViewById<TextView>(R.id.menuStart).performClick()
             title.findViewById<AppCompatEditText>(R.id.menuInputHost)
-                .onCreateInputConnection(EditorInfo())!!.commitText("play", 1)
+                .onCreateInputConnection(EditorInfo())!!.commitText("start", 1)
         }
-        assertDestination("options")
+        assertDestination("keyboard test")
         assertEquals(1, monitor.hits)
     }
 
     @Test fun tapContinuesTheMatchingPrefixAndBackReturnsToAnEmptyMenu() {
         instrumentation.runOnMainSync {
             val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
-            editor.onCreateInputConnection(EditorInfo())!!.setComposingText("pl", 1)
-            title.findViewById<TextView>(R.id.menuPlay).performClick()
+            editor.onCreateInputConnection(EditorInfo())!!.setComposingText("st", 1)
+            title.findViewById<TextView>(R.id.menuStart).performClick()
         }
-        assertDestination("play")
+        assertDestination("start")
         returnToMenu()
         instrumentation.runOnMainSync {
             assertEquals("", title.findViewById<AppCompatEditText>(R.id.menuInputHost).text.toString())
-            assertEquals(0, highlightedLetters(R.id.menuPlay))
-            assertEquals(1f, title.findViewById<TextView>(R.id.menuPlay).alpha)
+            assertEquals(0, highlightedLetters(R.id.menuStart))
+            assertEquals(1f, title.findViewById<TextView>(R.id.menuStart).alpha)
             assertEquals(0f, title.findViewById<MenuBackdropView>(R.id.menuBackdrop).transitionProgress)
         }
     }
@@ -113,57 +112,115 @@ class TitleMenuInstrumentedTest {
     @Test fun invalidInputResetsAndCanBeRetried() {
         instrumentation.runOnMainSync {
             val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
-            editor.onCreateInputConnection(EditorInfo())!!.commitText("plx", 1)
+            editor.onCreateInputConnection(EditorInfo())!!.commitText("stx", 1)
             assertEquals("", editor.text.toString())
-            assertEquals(0, highlightedLetters(R.id.menuPlay))
-            editor.onCreateInputConnection(EditorInfo())!!.commitText("ARMORY", 1)
+            assertEquals(0, highlightedLetters(R.id.menuStart))
+            editor.onCreateInputConnection(EditorInfo())!!.commitText("KEYBOARD TEST", 1)
         }
-        assertDestination("armory")
+        assertDestination("keyboard test")
     }
 
-    @Test fun typoThenArmoryCompletesWithoutLosingTheRestartingA() {
+    @Test fun typoThenKeyboardTestCompletesWithoutLosingTheRestartingK() {
         for (composing in listOf(false, true)) {
             instrumentation.runOnMainSync {
                 val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
                 val connection = editor.onCreateInputConnection(EditorInfo())!!
-                val source = "armorarmory"
+                val source = "keybokeyboard test"
                 for (index in source.indices) {
                     if (composing) connection.setComposingText(source.take(index + 1), 1)
                     else connection.commitText(source[index].toString(), 1)
-                    if (index == 5) assertEquals(1, highlightedLetters(R.id.menuArmory))
+                    if (index == 5) assertEquals(1, highlightedLetters(R.id.menuKeyboardTest))
                 }
             }
-            assertDestination("armory")
+            assertDestination("keyboard test")
             returnToMenu()
         }
     }
 
-    @Test fun repeatedAStaysHighlightedForEveryCommittedAndComposingUpdate() {
+    @Test fun repeatedKStaysHighlightedForEveryCommittedAndComposingUpdate() {
         for (composing in listOf(false, true)) {
             instrumentation.runOnMainSync {
                 val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
                 val connection = editor.onCreateInputConnection(EditorInfo())!!
                 repeat(5) { index ->
-                    if (composing) connection.setComposingText("a".repeat(index + 1), 1)
-                    else connection.commitText("a", 1)
-                    assertEquals("a must stay highlighted after update $index", 1,
-                        highlightedLetters(R.id.menuArmory))
+                    if (composing) connection.setComposingText("k".repeat(index + 1), 1)
+                    else connection.commitText("k", 1)
+                    assertEquals("k must stay highlighted after update $index", 1,
+                        highlightedLetters(R.id.menuKeyboardTest))
                 }
-                if (composing) connection.setComposingText("aaaaaarmory", 1)
-                else connection.commitText("rmory", 1)
+                if (composing) connection.setComposingText("kkkkkkeyboard test", 1)
+                else connection.commitText("eyboard test", 1)
             }
-            assertDestination("armory")
+            assertDestination("keyboard test")
             returnToMenu()
         }
     }
 
-    @Test fun allFourTapsNavigateToTheirOwnDestination() {
-        for ((id, command) in listOf(R.id.menuPlay to "play", R.id.menuArmory to "armory",
-            R.id.menuUpgrades to "upgrades", R.id.menuOptions to "options")) {
+    @Test fun activeTapsNavigateToTheirOwnDestination() {
+        for ((id, command) in listOf(R.id.menuStart to "start", R.id.menuKeyboardTest to "keyboard test")) {
             instrumentation.runOnMainSync { title.findViewById<TextView>(id).performClick() }
             assertDestination(command)
             returnToMenu()
         }
+    }
+
+    @Test fun keyboardTestAcceptsSeparateImeAndHardwareSpaceEvents() {
+        for (hardware in listOf(false, true)) {
+            instrumentation.runOnMainSync {
+                val editor = title.findViewById<AppCompatEditText>(R.id.menuInputHost)
+                val connection = editor.onCreateInputConnection(EditorInfo())!!
+                connection.setComposingText("keyboard", 1)
+                if (hardware) {
+                    connection.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,
+                        android.view.KeyEvent.KEYCODE_SPACE))
+                    connection.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
+                        android.view.KeyEvent.KEYCODE_SPACE))
+                } else connection.commitText(" ", 1)
+                assertEquals(9, highlightedLetters(R.id.menuKeyboardTest))
+                connection.commitText("test", 1)
+            }
+            assertDestination("keyboard test")
+            returnToMenu()
+        }
+    }
+
+    @Test fun comingSoonCannotBeTappedOrTypedAndLabelsFit() {
+        instrumentation.runOnMainSync {
+            val soon = title.findViewById<TextView>(R.id.menuComingSoon)
+            assertEquals("> coming soon...", soon.text.toString())
+            assertFalse(soon.isEnabled)
+            assertFalse(soon.isClickable)
+            assertFalse(soon.performClick())
+            title.findViewById<AppCompatEditText>(R.id.menuInputHost)
+                .onCreateInputConnection(EditorInfo())!!.commitText("coming soon...", 1)
+            assertEquals(0, highlightedLetters(R.id.menuComingSoon))
+            for (id in listOf(R.id.menuStart, R.id.menuComingSoon, R.id.menuKeyboardTest, R.id.menuQuit)) {
+                val row = title.findViewById<TextView>(id)
+                assertTrue(row.paint.measureText(row.text.toString()) <= row.width + 1)
+                assertEquals(1, row.lineCount)
+            }
+        }
+        SystemClock.sleep(750)
+        assertEquals(0, monitor.hits)
+        assertEquals(0, combatMonitor.hits)
+        capture("menu-current-disabled.png")
+    }
+
+    @Test fun typedQuitClosesTheGameTask() = checkQuit(tap = false)
+    @Test fun tappedQuitClosesTheGameTask() = checkQuit(tap = true)
+
+    private fun checkQuit(tap: Boolean) {
+        val taskId = title.taskId
+        instrumentation.runOnMainSync {
+            if (tap) title.findViewById<TextView>(R.id.menuQuit).performClick()
+            else title.findViewById<AppCompatEditText>(R.id.menuInputHost)
+                .onCreateInputConnection(EditorInfo())!!.commitText("quit", 1)
+        }
+        waitUntil { title.isDestroyed }
+        val manager = instrumentation.targetContext.getSystemService(android.app.ActivityManager::class.java)
+        assertTrue(manager.appTasks.none { it.taskInfo?.taskId == taskId })
+        assertEquals(0, monitor.hits)
+        assertEquals(0, combatMonitor.hits)
     }
 
     @Test fun completionAnimatesScaleAndOpacityBeforeNavigation() {
@@ -171,7 +228,7 @@ class TitleMenuInstrumentedTest {
         var centreY = 0f
         instrumentation.runOnMainSync {
             title.findViewById<AppCompatEditText>(R.id.menuInputHost)
-                .onCreateInputConnection(EditorInfo())!!.commitText("play", 1)
+                .onCreateInputConnection(EditorInfo())!!.commitText("start", 1)
             val overlay = title.findViewById<TextView>(R.id.menuSelectionOverlay)
             centreX = overlay.x + overlay.measuredWidth / 2f
             centreY = overlay.y + overlay.measuredHeight / 2f
@@ -188,7 +245,7 @@ class TitleMenuInstrumentedTest {
             assertTrue(title.findViewById<MenuBackdropView>(R.id.menuBackdrop).transitionProgress > 0f)
             captureWindow("menu-transition-pixel7a.png")
         }
-        assertDestination("play")
+        assertDestination("start")
     }
 
     @Test fun backgroundOutlinesDisappearWhileTheGridStaysVisible() {
@@ -222,10 +279,10 @@ class TitleMenuInstrumentedTest {
     }
 
     private fun assertDestination(command: String) {
-        destination = instrumentation.waitForMonitorWithTimeout(if (command == "play") combatMonitor else monitor, 5000)
+        destination = instrumentation.waitForMonitorWithTimeout(if (command == "start") combatMonitor else monitor, 5000)
         assertNotNull("$command should navigate after its animation", destination)
         instrumentation.runOnMainSync {
-            if (command == "play") {
+            if (command == "start") {
                 assertTrue(destination is CombatActivity)
                 assertNotNull(destination!!.findViewById<CombatView>(R.id.combatArena))
             } else {

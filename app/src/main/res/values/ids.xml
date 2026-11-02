@@ -3,10 +3,10 @@
     <item name="combatInputHost" type="id" />
     <item name="menuInputHost" type="id" />
     <item name="menuContent" type="id" />
-    <item name="menuPlay" type="id" />
-    <item name="menuArmory" type="id" />
-    <item name="menuUpgrades" type="id" />
-    <item name="menuOptions" type="id" />
+    <item name="menuStart" type="id" />
+    <item name="menuComingSoon" type="id" />
+    <item name="menuKeyboardTest" type="id" />
+    <item name="menuQuit" type="id" />
     <item name="menuLaunchIme" type="id" />
     <item name="menuSelectionOverlay" type="id" />
     <item name="menuBackdrop" type="id" />

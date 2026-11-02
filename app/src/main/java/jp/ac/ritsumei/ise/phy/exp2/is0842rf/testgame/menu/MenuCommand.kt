@@ -2,8 +2,9 @@ package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.menu
 
 import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordMatchState
 
-enum class MenuCommand(val text: String) {
-    PLAY("play"), ARMORY("armory"), UPGRADES("upgrades"), OPTIONS("options");
+enum class MenuCommand(val text: String, val selectable: Boolean = true) {
+    START("start"), COMING_SOON("coming soon...", selectable = false),
+    KEYBOARD_TEST("keyboard test"), QUIT("quit");
 }
 
 data class MenuInput(
@@ -13,5 +14,5 @@ data class MenuInput(
 ) {
     fun matchedCharacters(command: MenuCommand): Int =
         if (completedCommand == command) command.text.length
-        else words.first { it.definition.id == command.text }.matchedInputCharacters
+        else words.firstOrNull { it.definition.id == command.text }?.matchedInputCharacters ?: 0
 }

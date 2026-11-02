@@ -38,6 +38,23 @@ class WeaponActivationRulesTest {
             assertTrue(w.weaponActors.all { it.position == e.position })
         }
     }
+    @Test fun everyAdvertisedStartingGlyphHasWordsInTheJapaneseCombatPool() {
+        val dictionary = java.io.File("src/main/res/raw/word_list.txt")
+        assertTrue("Check the real bundled dictionary", dictionary.isFile)
+        val words = dictionary.readLines().filter { it.isNotBlank() }.map { line ->
+            val fields = line.split('\t')
+            WordDefinition("pool", fields.getOrElse(1) { fields[0] })
+        }.filter { it.readingLength in 2..7 }
+        val spellings = words.map { CompletedCombatWord(it, 1, Vec2.ZERO).glyphs }
+        for (glyph in WeaponTriggerGlyphs.startingGroups.joinToString("").toSet()) {
+            assertTrue("No playable word starts with $glyph", spellings.any { it.startsWith(glyph) })
+        }
+        for (glyph in (WeaponTriggerGlyphs.SPECTRE + WeaponTriggerGlyphs.HUNTER).toSet()) {
+            assertTrue("No playable word contains $glyph", spellings.any { glyph in it })
+        }
+        assertFalse(WeaponTriggerGlyphs.startingGroups.any { group -> group.any { it in "lqvx" } })
+    }
+
     @Test fun hunterUsesTenDamageHalfSecondCadenceAndDemoActiveLifetime() {
         val w = world(); val state = weapon(w, WeaponId.HUNTER).state
         val enemy = w.spawnEnemy(Vec2(300f, 100f), EnemyDefinition(maxHp = 1000, speed = 0f))

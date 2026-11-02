@@ -7,7 +7,7 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordDefinition
 
 /** Static menu targets adapt the shared game matcher; there is no menu-specific correctness algorithm. */
 class MenuInputController {
-    private val engine = WordMatchEngine(MenuCommand.entries.map {
+    private val engine = WordMatchEngine(MenuCommand.entries.filter { it.selectable }.map {
         WordDefinition(it.text, it.text, languageTag = "en")
     }, InputMode.ROMAJI)
 

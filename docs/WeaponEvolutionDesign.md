@@ -39,7 +39,7 @@ Repeaterと全11サブ武器は、最後のHPを削った武器へ1撃破を帰�
 | Orbiter | Continuum I–II / Storm Ring I–II / Doppelganger / Tether I–II |
 | Guardian | Toxic Ward I–II / Experimental Fuel I–II / Guardian Team I–II |
 
-追加発動文字はデモの`english.triggers`のy/z、v/wを使用する。この二組は一周で共有し、一組を取得した武器だけの条件へ追加する。他武器が次に取得すると残りの組を得る。両組取得済みなら追加文字の枝を候補から外す。日本語の入力方式にかかわらず辞書の標準ローマ字で条件を判定する既存方針を維持する。
+追加発動文字はデモの`english.triggers`のy/z、v/wを基に、日本語の実辞書で語頭が成立するy/zとwへ絞る（vは現行の2〜7文字語に該当なし）。WeaponTriggerGlyphsで発動処理と説明を共通化する。この二組は一周で共有し、一組を取得した武器だけの条件へ追加する。他武器が次に取得すると残りの組を得る。両組取得済みなら追加文字の枝を候補から外す。日本語の入力方式にかかわらず辞書の標準ローマ字で条件を判定する既存方針を維持する。
 
 Superchargedは取得後の生成20機ごと、Hunter Eliteは12機ごと。通常機と区別したインスタンスを作り、強化機のダメージ・持続・速度とHunterの射程を補正する。生成カウンターは武器controllerにあり、再描画や入力方式で変化しない。
 

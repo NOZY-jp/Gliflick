@@ -322,7 +322,7 @@ class OrbitActor(state: WeaponRunState, position: Vec2, initialAngle: Float, pri
 class SpectreWeapon : BaseSecondary(WeaponId.SPECTRE) {
     private var produced = 0
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        repeat(event.containsCount("aeo").coerceAtMost(8)) {
+        repeat(event.containsCount(WeaponTriggerGlyphs.SPECTRE).coerceAtMost(8)) {
             if (state.has(SUPERCHARGED)) produced++
             world.addActor(DroneActor(state, event.position,
                 state.has(SUPERCHARGED) && produced % 20 == 0))
@@ -332,7 +332,7 @@ class SpectreWeapon : BaseSecondary(WeaponId.SPECTRE) {
 class HunterWeapon : BaseSecondary(WeaponId.HUNTER) {
     private var produced = 0
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        repeat(event.containsCount("iou").coerceAtMost(8)) {
+        repeat(event.containsCount(WeaponTriggerGlyphs.HUNTER).coerceAtMost(8)) {
             if (state.has(HUNTER_ELITE)) produced++
             val enhanced = state.has(HUNTER_ELITE) && produced % 12 == 0
             world.addActor(HunterActor(state, event.position, enhanced,
@@ -350,7 +350,7 @@ class SentryWeapon : BaseSecondary(WeaponId.SENTRY) {
 }
 class TeslaMineWeapon : BaseSecondary(WeaponId.TESLA_MINE) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith(EvolutionEffects.triggerLetters(state, "bcde"))) {
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, WeaponTriggerGlyphs.TESLA))) {
             world.addActor(FieldActor(state, event.position,
                 WeaponVisualKind.TESLA, 32f, 12f, 38f, DamageType.ELECTRIC).also { it.angle = world.randomAngle() })
         }
@@ -433,7 +433,7 @@ class MinefieldWeapon : BaseSecondary(WeaponId.MINEFIELD) {
         world.addActor(MineActor(state, position, world.randomDirection()))
     } }
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith(EvolutionEffects.triggerLetters(state, "fghi"))) spawn(world, count, event.position)
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, WeaponTriggerGlyphs.MINEFIELD))) spawn(world, count, event.position)
     }
     override fun update(world: CombatWorld, dt: Float) {
         if (!state.has(RECURSIVE_MINES)) return
@@ -446,13 +446,13 @@ class MinefieldWeapon : BaseSecondary(WeaponId.MINEFIELD) {
 }
 class BladeTrapWeapon : BaseSecondary(WeaponId.BLADE_TRAP) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith(EvolutionEffects.triggerLetters(state, "jklm"))) world.addActor(FieldActor(state, event.position,
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, WeaponTriggerGlyphs.BLADE))) world.addActor(FieldActor(state, event.position,
             WeaponVisualKind.BLADE, 10f, 5f, 28f, DamageType.KINETIC))
     }
 }
 class OrbiterWeapon : BaseSecondary(WeaponId.ORBITER) {
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        if (event.startsWith(EvolutionEffects.triggerLetters(state, "nopq"))) {
+        if (event.startsWith(EvolutionEffects.triggerLetters(state, WeaponTriggerGlyphs.ORBITER))) {
             val delta = event.position - world.player.position
             world.addActor(OrbitActor(state, event.position, atan2(delta.y, delta.x)))
             if (state.has(DOPPELGANGER)) world.addActor(OrbitActor(state, event.position, atan2(delta.y, delta.x), false))
