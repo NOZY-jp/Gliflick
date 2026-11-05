@@ -83,7 +83,7 @@
 | シューター | HP 300〜7,200、ダメージ 25 |
 | ウォーダー | HP 300 |
 
-出典の表は複数のバリアント値を列挙している。本プロジェクトでは最初に必要な種類・バリアントだけを選ぶ。出現密度は独立した`EnemySpawnDensity`の暫定値で、毎tickの確率から一体ずつ出す。群れ・固定間隔の概念は持たない。適応値は公開デモの式を参照する。レベルアップ選択、Repeater強化、11サブ武器と基礎的な状態異常は[LevelUpDesign.md](LevelUpDesign.md)に実装範囲を記載。今回の敵種は実装済み。未指定のStalker/Wurm/Swarmerとボスは今回追加しない。サブ武器の進化は[WeaponEvolutionDesign.md](WeaponEvolutionDesign.md)。
+出典の表は複数のバリアント値を列挙している。本プロジェクトでは最初に必要な種類・バリアントだけを選ぶ。出現密度は独立した`EnemySpawnDensity`の暫定値で、毎tickの確率から一体ずつ出す。群れ・固定間隔の概念は持たない。適応値は公開デモの式を参照する。レベルアップ選択、Repeater強化、11サブ武器と基礎的な状態異常は[LevelUpDesign.md](LevelUpDesign.md)に実装範囲を記載。今回の敵種は実装済み。未指定のStalker/Wurm/Swarmerは追加しない。Gemini/Cypher/Poetは[BossAndRerollDesign.md](BossAndRerollDesign.md)に従い実装した。サブ武器の進化は[WeaponEvolutionDesign.md](WeaponEvolutionDesign.md)。
 
 ## サイズとティア外形
 

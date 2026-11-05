@@ -8,7 +8,8 @@ import jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordMatchState
 import kotlin.random.Random
 
 class EnemyCaption(val enemyId: Long, val word: WordDefinition, var anchor: Vec2, var state: WordMatchState,
-                   val placeBelowEnemy: Boolean = false, val radius: Float = 4.5f, val enemy: Enemy? = null) {
+                   val placeBelowEnemy: Boolean = false, val radius: Float = 4.5f, val enemy: Enemy? = null,
+                   val normalWord: WordDefinition = word, val cyphered: Boolean = false) {
     var age = 0f
     var retired = false
     var fadeAge: Float? = null
@@ -38,6 +39,13 @@ class CombatSession(
     private val mutableCaptions = mutableListOf<EnemyCaption>()
     private val mutableCompletions = mutableListOf<CompletedCaption>()
     private val mutablePickupCaptions = mutableListOf<PickupCaption>()
+    private var bossIntroEngine: WordMatchEngine? = null
+    private var bossIntroPreview: WordMatchState? = null
+    private var tendrilWord: WordDefinition? = null
+    private var poemWord: WordDefinition? = null
+    var tendrilState: WordMatchState? = null; private set
+    var poemState: WordMatchState? = null; private set
+    val bossIntroState get() = bossIntroPreview ?: bossIntroEngine?.snapshot()?.firstOrNull()
     private var wordVersion = 0L
     private var pendingTokens: List<InputToken> = emptyList()
     val captions: List<EnemyCaption> get() = mutableCaptions
@@ -81,8 +89,17 @@ class CombatSession(
             }
             return
         }
-        world.update(dt, typingBonuses.modifiers(engine.streak, world.elapsedSeconds))
+        if (world.bosses.introduction != null) return
+        val step = if (world.bosses.activeKind == null)
+            minOf(dt.toDouble(), (world.bosses.nextAppearanceAt - world.elapsedSeconds).coerceAtLeast(0.0)).toFloat() else dt
+        world.update(step, typingBonuses.modifiers(engine.streak, world.elapsedSeconds))
+        if (!world.isGameOver && world.bosses.requestIfDue(world.elapsedSeconds)) {
+            bossIntroEngine = WordMatchEngine(listOf(WordDefinition("boss-go", "go", languageTag = "en")), engine.inputMode)
+            pendingTokens = emptyList()
+            inputEpoch++
+        }
         syncEvents()
+        syncBossWords()
         mutableCaptions.forEach { caption ->
             caption.age += dt
             caption.fadeAge?.let { caption.fadeAge = it + dt }
@@ -96,7 +113,7 @@ class CombatSession(
 
     /** Space opens one queued reward, or rerolls while a choice is already open. */
     fun handleSpace(): Boolean {
-        if (world.isGameOver) return false
+        if (world.isGameOver || world.bosses.introduction != null) return false
         if (upgradeSelection != null) {
             rerollUpgrades()
             return true
@@ -147,6 +164,22 @@ class CombatSession(
 
     /** Uses the same speculative-composition contract as the existing input test and title menu. */
     fun onInput(tokens: List<InputToken>, composing: Boolean): Boolean {
+        bossIntroEngine?.let { intro ->
+            bossIntroPreview = if (composing) intro.previewInput(tokens).words.firstOrNull() else null
+            if (!composing || intro.previewInput(tokens).completedWords.isNotEmpty()) {
+                val done = tokens.flatMap { intro.accept(it) }.isNotEmpty()
+                if (done) {
+                    world.bosses.begin(world)
+                    bossIntroEngine = null
+                    bossIntroPreview = null
+                    pendingTokens = emptyList()
+                    inputEpoch++
+                    syncEvents(); syncBossWords()
+                }
+                return done
+            }
+            return false
+        }
         upgradeSelection?.let { return it.onInput(tokens, composing) }
         if (world.isGameOver) return false
         val preview = if (composing) engine.previewInput(tokens) else null
@@ -160,7 +193,7 @@ class CombatSession(
                 overlaps += engine.lastOverlapEvents
                 completed.forEach { word ->
                     completedAny = true
-                    if (mutableCaptions.any { it.word.id == word.id && !it.retired }) {
+                    if (mutableCaptions.any { it.word.id == word.id && !it.retired && it.enemy?.wordSealed != true }) {
                         typingBonuses.onWordCompleted(world.elapsedSeconds)
                     }
                     complete(word.id)
@@ -174,6 +207,21 @@ class CombatSession(
     }
 
     private fun complete(id: String) {
+        if (id == tendrilWord?.id) {
+            world.bosses.counterTendril()
+            val old = checkNotNull(tendrilWord)
+            if (world.bosses.tendril?.finished == false) {
+                tendrilWord = old.copy(id = "tendril-${wordVersion++}")
+                engine.replaceWord(id, checkNotNull(tendrilWord))
+            } else { engine.removeWord(id); tendrilWord = null; tendrilState = null }
+            return
+        }
+        if (id == poemWord?.id) {
+            engine.removeWord(id); poemWord = null; poemState = null
+            world.bosses.completePhrase(world)
+            syncBossWords()
+            return
+        }
         mutablePickupCaptions.firstOrNull { it.word.id == id }?.let {
             world.activatePickup(it.pickup.id)
             engine.removeWord(id)
@@ -188,22 +236,27 @@ class CombatSession(
         if (caption.retired) {
             engine.removeWord(id)
         } else {
-            world.completeWord(caption.word, caption.enemyId)
-            val next = selectWord(caption.enemyId)
+            val sealed = caption.enemy?.wordSealed == true
+            if (sealed) caption.enemy?.wordSealed = false else world.completeWord(caption.word, caption.enemyId)
+            val normal = if (sealed) caption.normalWord else selectWord(caption.enemyId)
+            val next = if (sealed) caption.word.copy(id = "enemy-${caption.enemyId}-word-${wordVersion++}")
+                else if (caption.enemy?.cyphered == true) cipherWord(normal) else normal
             engine.replaceWord(id, next)
             mutableCaptions += EnemyCaption(caption.enemyId, next, caption.anchor,
-                engine.snapshot().first { it.definition.id == next.id }, caption.placeBelowEnemy, caption.radius, caption.enemy)
+                engine.snapshot().first { it.definition.id == next.id }, caption.placeBelowEnemy, caption.radius, caption.enemy, normal, caption.enemy?.cyphered == true)
         }
     }
 
     private fun syncEvents() {
         world.drainEvents().forEach { event -> when (event) {
             is CombatEvent.Spawned -> {
-                val word = selectWord(event.enemy.id)
+                if (event.enemy.definition.bossKind == BossKind.POET) return@forEach
+                val normal = selectWord(event.enemy.id)
+                val word = if (event.enemy.cyphered) cipherWord(normal) else normal
                 engine.addWord(word, pendingTokens)
                 val placeBelowEnemy = event.enemy.spawnOrigin.y < world.height / 2f
                 mutableCaptions += EnemyCaption(event.enemy.id, word, event.enemy.position,
-                    engine.snapshot().first { it.definition.id == word.id }, placeBelowEnemy, event.enemy.radius, event.enemy)
+                    engine.snapshot().first { it.definition.id == word.id }, placeBelowEnemy, event.enemy.radius, event.enemy, normal, event.enemy.cyphered)
             }
             is CombatEvent.Died -> {
                 val caption = mutableCaptions.firstOrNull { it.enemyId == event.enemyId && !it.retired }
@@ -224,6 +277,7 @@ class CombatSession(
                 mutablePickupCaptions += PickupCaption(event.pickup, word,
                     engine.snapshot().first { it.definition.id == word.id })
             }
+            is CombatEvent.RerollCollected -> rerollsRemaining++
             is CombatEvent.PickupRemoved -> {
                 mutablePickupCaptions.filter { it.pickup.id == event.id }.forEach { engine.removeWord(it.word.id) }
                 mutablePickupCaptions.removeAll { it.pickup.id == event.id }
@@ -237,11 +291,51 @@ class CombatSession(
         val byId = states.associateBy { it.definition.id }
         mutableCaptions.forEach { caption -> byId[caption.word.id]?.let { caption.state = it } }
         mutablePickupCaptions.forEach { caption -> byId[caption.word.id]?.let { caption.state = it } }
+        tendrilState = tendrilWord?.let { byId[it.id] }
+        poemState = poemWord?.let { byId[it.id] }
     }
 
     private fun pruneRetired() {
         mutableCaptions.filter { it.retired && it.fadeAge == null && it.state.matchedInputCharacters == 0 }
             .forEach { engine.removeWord(it.word.id); it.fadeAge = 0f }
+    }
+
+    private fun cipherWord(normal: WordDefinition): WordDefinition {
+        val kana = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわ"
+        var text: String
+        do { text = (0 until normal.readingLength).joinToString("") { kana[random.nextInt(kana.length)].toString() } }
+        while (text == normal.text)
+        return WordDefinition("cipher-${wordVersion++}", text, "暗号")
+    }
+
+    private fun syncBossWords() {
+        mutableCaptions.toList().filter { !it.retired && it.enemy?.isAlive == true && it.cyphered != it.enemy.cyphered }
+            .forEach { caption ->
+                val next = if (caption.enemy!!.cyphered) cipherWord(caption.normalWord)
+                    else selectWord(caption.enemyId)
+                engine.removeWord(caption.word.id)
+                engine.addWord(next, pendingTokens)
+                mutableCaptions.remove(caption)
+                mutableCaptions += EnemyCaption(caption.enemyId, next, caption.anchor,
+                    engine.snapshot().first { it.definition.id == next.id }, caption.placeBelowEnemy, caption.radius,
+                    caption.enemy, if (caption.enemy.cyphered) caption.normalWord else next, caption.enemy.cyphered)
+            }
+        val tendril = world.bosses.tendril?.takeUnless { it.finished }
+        if (tendril == null) {
+            tendrilWord?.let { engine.removeWord(it.id) }; tendrilWord = null
+        } else if (tendrilWord == null) {
+            tendrilWord = WordDefinition("tendril-${wordVersion++}", tendril.glyph)
+            engine.addWord(checkNotNull(tendrilWord), pendingTokens)
+        }
+        val phrase = if(world.bosses.activeKind == BossKind.POET)
+            PoetPassage.phrases.getOrNull(world.bosses.poemIndex) else null
+        if (phrase == null) {
+            poemWord?.let { engine.removeWord(it.id) }; poemWord = null
+        } else if (poemWord == null) {
+            poemWord = WordDefinition("poem-${wordVersion++}", phrase.reading, phrase.label)
+            engine.addWord(checkNotNull(poemWord), pendingTokens)
+        }
+        refreshStates()
     }
 
     private fun selectWord(enemyId: Long): WordDefinition {

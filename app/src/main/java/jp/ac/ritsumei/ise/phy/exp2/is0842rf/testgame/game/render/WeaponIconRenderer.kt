@@ -29,6 +29,9 @@ class WeaponIconRenderer(private val context: Context) {
         drawResource(canvas, actorResource(id), x, y, radius, color)
     }
 
+    fun drawReroll(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) =
+        drawResource(canvas, R.raw.pickup_reroll, x, y, radius, color)
+
     fun drawHunterElite(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) =
         drawResource(canvas, R.raw.weapon_actor_hunter_elite, x, y, radius, color)
 

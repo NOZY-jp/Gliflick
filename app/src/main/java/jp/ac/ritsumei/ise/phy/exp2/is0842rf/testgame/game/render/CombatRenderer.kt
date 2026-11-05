@@ -29,6 +29,8 @@ import kotlin.math.min
 /** Presentation only: no matching, damage, spawning, or weapon timing. Coordinates are logical dp. */
 class CombatRenderer(context: Context) {
     private val enemyRenderer = EnemyRenderer(context)
+    private val bossRenderer = BossRenderer(context)
+    private val chips = TypingChipRenderer()
     private val secondaryRenderer = SecondaryWeaponRenderer(context)
     private val upgradeRenderer = UpgradeRenderer(context)
     private val gridBackground = GridBackgroundRenderer(context)
@@ -69,6 +71,7 @@ class CombatRenderer(context: Context) {
                 canvas.restore()
             }
         } }
+        bossRenderer.drawField(canvas, world)
         enemyRenderer.drawProtection(canvas, world)
         world.enemies.forEach { enemy ->
             val alpha = (255f * (1f - (enemy.deathAge ?: 0f) / CombatWorld.DEATH_FADE_SECONDS)
@@ -101,7 +104,9 @@ class CombatRenderer(context: Context) {
         drawHud(canvas, world, width)
         drawTypingBonuses(canvas, session, width)
         secondaryRenderer.drawArsenal(canvas, world, width, height)
+        bossRenderer.drawHud(canvas, session, width, height)
         upgradeRenderer.draw(canvas, session, width, height)
+        bossRenderer.drawIntroduction(canvas, session, width, height)
         if (world.isGameOver) {
             paint.color = Color.argb(200, 239, 239, 229)
             canvas.drawRect(0f, 0f, width, height, paint)
@@ -385,18 +390,18 @@ class CombatRenderer(context: Context) {
     private data class CaptionGeometry(val centerX: Float, val centerY: Float,
         val wordSize: Float, val labelSize: Float, val wordWidth: Float, val wordBaseline: Float,
         val scale: Float, val boxes: List<CaptionTextBox>)
-    private data class CaptionDraw(val state: WordMatchState, val alpha: Float, val geometry: CaptionGeometry)
+    private data class CaptionDraw(val state: WordMatchState, val alpha: Float, val geometry: CaptionGeometry, val sealed: Boolean = false, val chip: Boolean = false)
 
     private fun drawCaptions(canvas: Canvas, session: CombatSession, width: Float, height: Float) {
         val layers = mutableListOf<CaptionLayer<CaptionDraw>>()
         fun add(state: WordMatchState, anchor: Vec2, alpha: Float, scale: Float,
-                below: Boolean, radius: Float, owner: Long, enemy: Enemy?) {
+                below: Boolean, radius: Float, owner: Long, enemy: Enemy?, chip: Boolean = false) {
             if (alpha <= 0f) return
             val geometry = captionGeometry(state, anchor, scale, width, height, below, radius)
             val priority = CaptionPriority(!state.isCompleted && state.matchedInputCharacters > 0,
                 enemy?.let { (it.definition.maxHp - it.hp).toDouble() / it.definition.maxHp } ?: 0.0,
                 enemy?.definition?.tier ?: 0, enemy?.id ?: if (owner > 0) owner else -owner)
-            layers += CaptionLayer(owner, priority, geometry.boxes, CaptionDraw(state, alpha, geometry))
+            layers += CaptionLayer(owner, priority, if(chip) geometry.boxes.take(1).map { CaptionTextBox(it.left-8f,it.top-4f,it.right+8f,it.bottom+4f) } else geometry.boxes, CaptionDraw(state, alpha, geometry, enemy?.wordSealed == true, chip))
         }
         session.captions.forEach {
             add(it.state, it.anchor, it.alpha, 1f, it.placeBelowEnemy, it.radius, it.enemyId, it.enemy)
@@ -407,7 +412,7 @@ class CombatRenderer(context: Context) {
                 it.enemy?.id ?: Long.MAX_VALUE, it.enemy)
         }
         session.pickupCaptions.forEach {
-            add(it.state, it.pickup.position, 1f, 1f, false, 9f, -it.pickup.id, null)
+            add(it.state, it.pickup.position, 1f, 1f, false, 9f, -it.pickup.id, null, it.pickup.kind == jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat.PickupKind.REROLL)
         }
         CaptionOverlapPolicy.arrange(layers).forEach { drawCaption(canvas, it.layer.content, it.subdued) }
     }
@@ -447,6 +452,20 @@ class CombatRenderer(context: Context) {
     private fun drawCaption(canvas: Canvas, caption: CaptionDraw, subdued: Boolean) {
         val state = caption.state
         val geometry = caption.geometry
+        if(caption.chip) {
+            chips.draw(canvas,state,geometry.centerX,geometry.wordBaseline,geometry.wordWidth+24f,geometry.wordSize,
+                alpha=caption.alpha*if(subdued)0.32f else 1f)
+            return
+        }
+        if(caption.sealed) {
+            paint.style=Paint.Style.STROKE;paint.strokeWidth=0.65f;paint.color=muted
+            val left=geometry.centerX-geometry.wordWidth/2f-4f
+            val top=geometry.wordBaseline-geometry.wordSize
+            val right=geometry.centerX+geometry.wordWidth/2f+4f
+            canvas.drawRect(left,top,right,geometry.wordBaseline+4f,paint)
+            paint.style=Paint.Style.FILL;paint.textAlign=Paint.Align.LEFT;paint.textSize=9f
+            canvas.drawText("²",right+2f,top+2f,paint)
+        }
         fun color(value: Int): Int {
             if (!subdued) return value
             val gray = (0.2126f * Color.red(value) + 0.7152f * Color.green(value) + 0.0722f * Color.blue(value)).toInt()

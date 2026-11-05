@@ -22,6 +22,7 @@ class LevelUpInstrumentedTest {
     private fun launch(): CombatActivity =
         (instrumentation.startActivitySync(Intent(instrumentation.targetContext, CombatActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as CombatActivity).also {
+            instrumentation.runOnMainSync { it.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
             waitUntil { it.hasWindowFocus() && it.findViewById<CombatView>(R.id.combatArena).height > 0 }
             SystemClock.sleep(550)
         }
@@ -108,20 +109,24 @@ class LevelUpInstrumentedTest {
         val activity = launch()
         try {
             instrumentation.runOnMainSync {
-                val world = activity.findViewById<CombatView>(R.id.combatArena).session.world
+                val arena = activity.findViewById<CombatView>(R.id.combatArena)
+                arena.stop()
+                val world = arena.session.world
                 listOf(WeaponId.SENTRY, WeaponId.HUNTER, WeaponId.GUARDIAN, WeaponId.ORBITER).forEach { world.acquireWeapon(it) }
                 val enemy = world.spawnEnemy(world.player.position + Vec2(50f, -30f),
                     EnemyDefinition(maxHp = 10000, speed = 0f))
                 world.spawnEnemy(world.player.position + Vec2(-75f, 60f), EnemyDefinition(maxHp = 10000, speed = 0f))
                 world.completeWord(WordDefinition("north", "north", languageTag = "en"), enemy.id)
+                assertTrue("Expected all four actor types immediately: ${world.weaponActors.map { it.source }}",world.weaponActors.size >= 4)
                 world.spawnPickup(PickupKind.FUEL, world.player.position + Vec2(-90f, -75f))
+                repeat(84) { arena.session.update(1f/120f) }
             }
             SystemClock.sleep(700)
             capture(activity, "arsenal-phone.png")
             instrumentation.runOnMainSync {
                 val world = activity.findViewById<CombatView>(R.id.combatArena).session.world
                 assertEquals(4, world.secondaryWeapons.size)
-                assertTrue(world.weaponActors.size >= 4)
+                assertTrue("Expected all four actor types: ${world.weaponActors.map { it.source }}",world.weaponActors.size >= 4)
                 assertTrue(world.dps(WeaponId.GUARDIAN) > 0f)
             }
         } finally { instrumentation.runOnMainSync { activity.finish() } }

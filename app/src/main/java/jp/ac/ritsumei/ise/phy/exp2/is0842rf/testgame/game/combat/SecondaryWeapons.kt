@@ -23,7 +23,7 @@ object WeaponSizeTuning {
         WeaponId.REPEATER, WeaponId.SPECTRE, WeaponId.SENTRY, WeaponId.OSCILLATOR, WeaponId.HUNTER -> 1f
     }
 }
-enum class PickupKind(val title: String) { METEOR("爆撃照準"), FUEL("燃料") }
+enum class PickupKind(val title: String) { METEOR("爆撃照準"), FUEL("燃料"), REROLL("リロール") }
 class CombatPickup(val id: Long, val kind: PickupKind, var position: Vec2, val lifetime: Float = 14f,
                    val fuelBonus: WeaponStat? = null) {
     var age = 0f
@@ -97,7 +97,7 @@ abstract class WeaponActor(
                 if (allowCrit) 0.01f + state.bonus(WeaponStat.CRIT) + world.currentWeaponModifiers.criticalChanceBonus else 0f,
                 2f + state.bonus(WeaponStat.CRIT_MULTIPLIER))
             val poison = state.rank(POISON_COATING)
-            if (poison > 0 && enemy.isAlive) world.dealDamage(enemy.id,
+            if (poison > 0 && enemy.isAttackable) world.dealDamage(enemy.id,
                 (5f * poison * state.scale(WeaponStat.DAMAGE)).roundToInt(), source, DamageType.CHEMICAL, inflictStatus = false)
             hitTimes[enemy.id] = world.elapsedSeconds + interval /
                 (state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
@@ -129,7 +129,7 @@ class DroneActor(state: WeaponRunState, position: Vec2, val enhanced: Boolean = 
             }
             return
         }
-        val target = world.enemies.firstOrNull { it.id == targetId && it.isAlive }
+        val target = world.enemies.firstOrNull { it.id == targetId && it.isAttackable }
             ?: world.nearestEnemy(position) ?: return
         targetId = target.id
         val delta = target.position - position
@@ -161,7 +161,7 @@ class GuardianActor(state: WeaponRunState, position: Vec2, val index: Int = 0) :
         active = remaining > 0f
         if (!active) return
         orbitAngle += dt * 3.6f * state.scale(WeaponStat.RATE)
-        val target = world.enemies.filter { it.isAlive &&
+        val target = world.enemies.filter { it.isAttackable &&
             (it.position - world.player.position).length() <= range + it.radius }
             .minByOrNull { (it.position - position).length() }
         val destination = target?.position ?: (world.player.position + Vec2(20f * cos(index * 2.1f), -20f + 20f * sin(index * 2.1f)))
@@ -171,7 +171,7 @@ class GuardianActor(state: WeaponRunState, position: Vec2, val index: Int = 0) :
             val travel = (delta.length() - if (target != null) orbitRadius * 0.6f else 0f).coerceAtLeast(0f)
             position += delta.normalized() * min(travel, 48f * state.scale(WeaponStat.SPEED) * dt)
         }
-        world.enemies.filter { it.isAlive }.forEach { enemy ->
+        world.enemies.filter { it.isAttackable }.forEach { enemy ->
             if (listOf(0f, PI.toFloat()).any { phase ->
                 (enemy.position - fireballPosition(phase)).length() <= enemy.radius + fireballRadius
             }) hit(world, enemy, 0.1f)
@@ -221,7 +221,7 @@ class FieldActor(state: WeaponRunState, position: Vec2, kind: WeaponVisualKind,
         if (visual == WeaponVisualKind.BLADE)
             angle += dt * 4f * state.scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier
         if (visual == WeaponVisualKind.BLADE) {
-            world.enemies.filter { it.isAlive && (it.position - position).length() <= range + it.radius }.forEach { enemy ->
+            world.enemies.filter { it.isAttackable && (it.position - position).length() <= range + it.radius }.forEach { enemy ->
                 val relative = enemy.position - position
                 val projection = atan2(relative.y, relative.x) - angle
                 val spokeDistance = min(abs(sin(projection)), abs(cos(projection))) * relative.length()
@@ -231,7 +231,7 @@ class FieldActor(state: WeaponRunState, position: Vec2, kind: WeaponVisualKind,
             cooldown -= dt
             if (cooldown <= 0f) {
                 val targets = if (visual == WeaponVisualKind.TESLA) world.enemies.filter {
-                    it.isAlive && (it.position - position).length() <= range + it.radius
+                    it.isAttackable && (it.position - position).length() <= range + it.radius
                 } else emptyList()
                 world.areaDamage(position, range, damage, source, type, allowCrit = visual != WeaponVisualKind.TESLA)
                 if (visual == WeaponVisualKind.TESLA) {
@@ -256,7 +256,7 @@ class MovingBladeActor(state: WeaponRunState, position: Vec2, private var veloci
         if (returning) velocity = (world.player.position - position).normalized() * velocity.length()
         position += velocity * (state.scale(WeaponStat.SPEED) * dt)
         angle += dt * 12f * state.scale(WeaponStat.RATE)
-        world.enemies.filter { it.isAlive }.forEach { enemy ->
+        world.enemies.filter { it.isAttackable }.forEach { enemy ->
             if (sweptCircleHit(previous - enemy.previousPosition, position - enemy.position, range + enemy.radius) != null)
                 hit(world, enemy, 0.22f)
         }
@@ -278,7 +278,7 @@ class MineActor(state: WeaponRunState, position: Vec2, private val direction: Ve
             (it.position - position).normalized() } ?: direction else direction
         position += movement * (18f * state.scale(WeaponStat.SPEED) * dt)
         angle += dt * 4.7f
-        val hit = world.enemies.any { it.isAlive &&
+        val hit = world.enemies.any { it.isAttackable &&
             sweptCircleHit(previous - it.previousPosition, position - it.position, 4f * sizeScale + it.radius) != null }
         if (hit) {
             world.areaDamage(position, range, damage, source, type)
@@ -300,7 +300,7 @@ class OrbitActor(state: WeaponRunState, position: Vec2, initialAngle: Float, pri
         if (orbitRadius == null) orbitRadius = (position - world.player.position).length()
         angle += dt * 1.8f * state.scale(WeaponStat.SPEED) * if (clockwise) 1f else -1f
         position = world.player.position + Vec2(cos(angle), sin(angle)) * orbitRadius!!
-        world.enemies.filter { it.isAlive }.forEach {
+        world.enemies.filter { it.isAttackable }.forEach {
             if (sweptCircleHit(previous - it.previousPosition, position - it.position, range + it.radius) != null)
                 hit(world, it, 0.5f)
             else if (state.has(TETHER) && sweptCircleHit(world.player.position - it.position,

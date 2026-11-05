@@ -7,6 +7,7 @@ object EnemyCatalog {
     // Measured full silhouette bounds; the physical Shooter collider remains 15 source units.
     private val shooterVisualRadii = listOf(22.501f, 36.202f, 47.951f, 51.151f, 52.274f)
     fun definition(kind: EnemyKind, tier: Int = 1): EnemyDefinition = when (kind) {
+        EnemyKind.BOSS -> error("Boss bodies are defined by BossDirector.")
         EnemyKind.DRONE -> DroneTierCatalog.definition(tier)
         EnemyKind.SHIELD_DRONE -> {
             require(tier in 1..5)

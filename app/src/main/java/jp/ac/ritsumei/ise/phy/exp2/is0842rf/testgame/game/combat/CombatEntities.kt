@@ -18,7 +18,7 @@ data class Vec2(val x: Float, val y: Float) {
     companion object { val ZERO = Vec2(0f, 0f) }
 }
 
-enum class EnemyKind { DRONE, SHIELD_DRONE, SHOOTER, SHOOTER_MISSILE, WARDER, SPLITTER, SPLITTER_SHARD }
+enum class EnemyKind { DRONE, SHIELD_DRONE, SHOOTER, SHOOTER_MISSILE, WARDER, SPLITTER, SPLITTER_SHARD, BOSS }
 enum class EnemyVariant { NORMAL }
 enum class EnemyShape(val sides: Int) {
     CIRCLE(0), TRIANGLE(3), SQUARE(4), PENTAGON(5), HEXAGON(6), HEPTAGON(7), OCTAGON(8)
@@ -77,7 +77,8 @@ data class EnemyDefinition(
     val mutation: EnemyMutation = EnemyMutation.NONE,
     val maxShield: Int = 0,
     val splitter: SplitterDefinition? = null,
-    val collisionRadius: Float = radius
+    val collisionRadius: Float = radius,
+    val bossKind: BossKind? = null
 ) {
     init { require(maxHp > 0 && speed >= 0f && contactDamage >= 0 && maxShield >= 0 && collisionRadius > 0f && radius > 0f && size > 0f && tier > 0) }
 }
@@ -86,17 +87,19 @@ data class EnemyDefinition(
 interface Durability {
     val hp: Int
     fun takeDamage(amount: Int)
+    fun heal(amount: Int) = Unit
     fun takeDamageAt(amount: Int, part: Int) = takeDamage(amount)
     val shield: Float get() = 0f
     val maxShield: Int get() = 0
     fun advance(dt: Float) = Unit
 }
 
-class HealthPool(maxHp: Int) : Durability {
+class HealthPool(private val maxHp: Int) : Durability {
     init { require(maxHp > 0) }
     override var hp = maxHp
         private set
     override fun takeDamage(amount: Int) { hp = (hp - amount.coerceAtLeast(0)).coerceAtLeast(0) }
+    override fun heal(amount: Int) { hp = (hp + amount.coerceAtLeast(0)).coerceAtMost(maxHp) }
 }
 
 /** Per-instance behavior can keep its own timers; definitions never share mutable behavior state. */
@@ -127,6 +130,9 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
     val splitterHealth get() = durability as? SplitterHealth
     val releasedPartIds = mutableMapOf<Int, Long>()
     val populationCost get() = definition.splitter?.partCount ?: 1
+    var cyphered = false
+    var wordSealed = false
+    fun heal(amount: Int) { if (isAlive) durability.heal(amount) }
     var angle = 0f
     var previousAngle = 0f
     var deploymentPosition: Vec2? = null
@@ -139,6 +145,7 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
         (splitterHealth?.partHealth?.get(it.part) ?: 0) > 0 }?.position ?: position
     fun drainActions() = behavior.drainActions()
     fun hitCircles(): List<EnemyHitCircle> {
+        if (definition.bossKind == BossKind.POET) return emptyList()
         val group = definition.splitter ?: return listOf(EnemyHitCircle(0, position, previousPosition, definition.collisionRadius * size))
         return List(group.partCount) { part ->
             val phase = part * 2f * PI.toFloat() / group.partCount
@@ -150,6 +157,7 @@ class Enemy(val id: Long, val definition: EnemyDefinition, var position: Vec2) {
     var deathAge: Float? = null
         internal set
     val isAlive get() = hp > 0 && deathAge == null
+    val isAttackable get() = isAlive && definition.bossKind != BossKind.POET
     var frozenSeconds = 0f
     val statuses = mutableListOf<EnemyStatus>()
     fun advance(dt: Float, destination: Vec2) {

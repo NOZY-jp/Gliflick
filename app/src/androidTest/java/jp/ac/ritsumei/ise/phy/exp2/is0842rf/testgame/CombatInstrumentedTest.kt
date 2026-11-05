@@ -25,6 +25,7 @@ class CombatInstrumentedTest {
     @Test fun keyboardCompletionFiresThreeShotsAndUpdatesSharedXpHud() {
         val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, CombatActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as CombatActivity
+        instrumentation.runOnMainSync { activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         try {
             seedEnemy(activity)
             waitUntil { activity.hasWindowFocus() && activity.findViewById<CombatView>(R.id.combatArena).session.captions.isNotEmpty() }
@@ -69,6 +70,7 @@ class CombatInstrumentedTest {
     @Test fun pausedFrameLoopDoesNotAdvanceOrCatchUpOnResume() {
         val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, CombatActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as CombatActivity
+        instrumentation.runOnMainSync { activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         try {
             waitUntil { activity.findViewById<CombatView>(R.id.combatArena).session.world.elapsedSeconds > 0.1 }
             var pausedAt = 0.0
@@ -94,6 +96,7 @@ class CombatInstrumentedTest {
     @Test fun retryStartsACleanWorldAndClearsTheImeComposition() {
         val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, CombatActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as CombatActivity
+        instrumentation.runOnMainSync { activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         try {
             seedEnemy(activity)
             waitUntil { activity.hasWindowFocus() && activity.findViewById<CombatView>(R.id.combatArena).session.captions.isNotEmpty() }

@@ -29,6 +29,7 @@ sealed interface CombatEvent {
     data class Died(val enemyId: Long, val position: Vec2) : CombatEvent
     data class PickupSpawned(val pickup: CombatPickup) : CombatEvent
     data class PickupRemoved(val id: Long) : CombatEvent
+    data object RerollCollected : CombatEvent
 }
 
 /** Single-threaded domain simulation. Rendering and keyboard transport do not live here. */
@@ -38,7 +39,9 @@ class CombatWorld(
     private val spawnPolicy: EnemySpawnPolicy = MixedEnemySpawnPolicy(populationLimit = config.maxEnemiesAlive),
     val mainWeapon: MainWeapon = Repeater(),
     private val spawnDensity: EnemySpawnDensity = (spawnPolicy as? EnemySpawnRate)
-        ?.let(::PoissonEnemySpawnDensity) ?: RandomEnemySpawnDensity()
+        ?.let(::PoissonEnemySpawnDensity) ?: RandomEnemySpawnDensity(),
+    val bosses: BossDirector = BossDirector(),
+    private val rerollDrops: RerollDropPolicy = RerollDropPolicy()
 ) {
     val player = Player(config.playerMaxHp)
     init {
@@ -96,6 +99,7 @@ class CombatWorld(
         if (!first) {
             val sx = newWidth / width
             val sy = newHeight / height
+            bosses.resize(sx, sy)
             mutableEnemies.forEach {
                 it.position = it.position.scaled(sx, sy)
                 it.previousPosition = it.position
@@ -119,6 +123,7 @@ class CombatWorld(
         width = newWidth
         height = newHeight
         player.position = Vec2(width / 2f, height / 2f)
+        bosses.onViewportChanged(this)
     }
 
     fun spawnEnemy(position: Vec2, definition: EnemyDefinition = spawnPolicy.choose(elapsedSeconds, level, random, enemies)): Enemy =
@@ -131,11 +136,11 @@ class CombatWorld(
     }
 
     fun target(enemyId: Long) {
-        mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let { mainWeapon.target(it.id, it.aimPosition) }
+        mutableEnemies.firstOrNull { it.id == enemyId && it.isAttackable }?.let { mainWeapon.target(it.id, it.aimPosition) }
     }
 
     fun completeWord(word: jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.WordDefinition, enemyId: Long) {
-        val enemy = mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive } ?: return
+        val enemy = mutableEnemies.firstOrNull { it.id == enemyId && it.isAttackable } ?: return
         target(enemyId)
         val event = CompletedCombatWord(word, enemyId, enemy.position)
         mutableSecondaryWeapons.forEach { it.onWord(this, event) }
@@ -198,7 +203,7 @@ class CombatWorld(
     }
 
     fun nearestEnemy(position: Vec2, range: Float = Float.MAX_VALUE): Enemy? =
-        enemies.filter { it.isAlive && (it.position - position).length() <= range + it.radius }
+        enemies.filter { it.isAlive && it.definition.bossKind != BossKind.POET && (it.position - position).length() <= range + it.radius }
             .minByOrNull { (it.position - position).length() }
     fun randomIndex(bound: Int) = random.nextInt(bound)
     fun removePickups(kind: PickupKind) {
@@ -222,13 +227,14 @@ class CombatWorld(
     fun addEffect(effect: WeaponEffect) { if (mutableEffects.size < 160) mutableEffects += effect }
     fun hasPickup(kind: PickupKind) = pickups.any { it.kind == kind }
     fun spawnPickup(kind: PickupKind, position: Vec2, fuelBonus: WeaponStat? = null): CombatPickup {
-        val pickup = CombatPickup(nextPickupId++, kind, position, fuelBonus = fuelBonus)
+        val pickup = CombatPickup(nextPickupId++, kind, position, lifetime = if(kind == PickupKind.REROLL) 30f else 14f, fuelBonus = fuelBonus)
         mutablePickups += pickup
         events += CombatEvent.PickupSpawned(pickup)
         return pickup
     }
     fun activatePickup(id: Long) {
         val pickup = mutablePickups.firstOrNull { it.id == id } ?: return
+        if (pickup.kind == PickupKind.REROLL) events += CombatEvent.RerollCollected
         mutableSecondaryWeapons.forEach { it.activatePickup(this, pickup) }
         if (mutablePickups.remove(pickup)) events += CombatEvent.PickupRemoved(id)
     }
@@ -264,7 +270,7 @@ class CombatWorld(
                    inflictStatus: Boolean = true, hitPosition: Vec2? = null, incomingAngle: Float? = null,
                    hitPart: Int = 0, projectileImpact: Boolean = false) {
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
-            if (isProtected(it)) return
+            if (isProtected(it) || it.definition.bossKind == BossKind.POET) return
             val bleeding = it.statuses.any { status -> status.type == DamageType.KINETIC && status.partIndex == hitPart }
             val bloodbathRank = weaponState(WeaponId.CHOPPER)?.rank(SecondaryEvolution.BLOODBATH) ?: 0
             val bloodBonus = if (source == WeaponId.CHOPPER && bleeding && bloodbathRank > 0)
@@ -386,7 +392,7 @@ class CombatWorld(
             enemy.drainActions().forEach { action -> when (action) {
                 is EnemyAction.FireMissile -> launchEnemyMissile(enemy, action.direction)
             } }
-            val contact = if (enemy.activationProgress >= 1f) enemy.hitCircles().firstOrNull {
+            val contact = if (enemy.definition.bossKind == null && enemy.activationProgress >= 1f) enemy.hitCircles().firstOrNull {
                 sweptCircleHit(it.previousPosition - player.position, it.position - player.position,
                     it.radius + player.radius) != null
             } else null
@@ -482,9 +488,10 @@ class CombatWorld(
             if ((definition.splitter?.partCount ?: 1) <= arrivalCapacity(enemies, config.maxEnemiesAlive))
                 spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
         }
+        bosses.update(this, dt)
     }
 
-    fun isProtected(enemy: Enemy): Boolean = enemy.definition.kind != EnemyKind.WARDER && enemy.isAlive &&
+    fun isProtected(enemy: Enemy): Boolean = enemy.definition.bossKind == null && enemy.definition.kind != EnemyKind.WARDER && enemy.isAlive &&
         barriers.any { it.isAlive && !outside(it.owner.position, it.owner.radius) &&
             (enemy.position - it.owner.position).length() < it.protectionRadius }
 
@@ -549,6 +556,18 @@ class CombatWorld(
         return enemies.firstOrNull { it.id == released && it.isAlive }?.let { it to 0 }
     }
 
+    /** Keep the existing global body cap when a scheduled boss enters a full arena. */
+    internal fun prepareBossSlots(count: Int) {
+        require(count <= config.maxEnemiesAlive)
+        while(livingPopulation + count > config.maxEnemiesAlive) {
+            val farthest=enemies.filter { it.isAlive && it.definition.bossKind == null }
+                .maxByOrNull { (it.position-player.position).length() } ?: break
+            die(farthest, awardExperience=false)
+        }
+    }
+
+    internal fun defeatBossBody(enemy: Enemy) = die(enemy, awardExperience = true)
+
     private fun die(enemy: Enemy, awardExperience: Boolean, source: WeaponId? = null,
                     lastAim: Vec2 = enemy.aimPosition) {
         if (enemy.deathAge != null) return
@@ -559,6 +578,8 @@ class CombatWorld(
         mutableBursts += DeathBurst(enemy.position, random)
         events += CombatEvent.Died(enemy.id, enemy.position)
         if (awardExperience) {
+            if (config.spawningEnabled && enemy.definition.bossKind == null && rerollDrops.onDeath(elapsedSeconds, random))
+                spawnPickup(PickupKind.REROLL, clampPoint(enemy.position, 38f))
             kills++
             val state = if (source == WeaponId.REPEATER) (mainWeapon as? Repeater)?.upgrades
                 else secondaryWeapons.firstOrNull { it.id == source }?.state

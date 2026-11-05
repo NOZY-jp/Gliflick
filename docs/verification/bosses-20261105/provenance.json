@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-05",
+  "target": "physical Pixel 7a",
+  "tests": {
+    "tests": 190,
+    "failures": 0,
+    "errors": 0
+  },
+  "android_tests": 11,
+  "android_failures": 0,
+  "apk_sha256": "6c22aa6b98d219b1bcb67a5cc3533ab2c3c102385158149e908a37f3b9df34ea",
+  "installed_sha256": "6c22aa6b98d219b1bcb67a5cc3533ab2c3c102385158149e908a37f3b9df34ea",
+  "installed_matches_build": true,
+  "temporary_stay_awake_original": 0,
+  "temporary_stay_awake_restored": 0,
+  "screenshots": "actual cropped arena; controlled encounters, not natural elapsed play or human typing"
+}

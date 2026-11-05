@@ -46,6 +46,18 @@ class EnemyRenderer(private val context: Context) {
     fun drawBody(canvas: Canvas, enemy: Enemy, color: Int): Boolean {
         val tier = enemy.definition.tier - 1
         when (enemy.definition.kind) {
+            EnemyKind.BOSS -> when (enemy.definition.bossKind) {
+                BossKind.GEMINI -> {
+                    shape(canvas, R.raw.boss_gemini, enemy.position, enemy.radius, 0f, color)
+                    paint.color = color; paint.style = Paint.Style.FILL
+                    val pupil = enemy.position + Vec2(kotlin.math.cos(enemy.angle), kotlin.math.sin(enemy.angle)) * (enemy.radius * 0.18f)
+                    canvas.drawCircle(pupil.x, pupil.y, enemy.radius * 0.14f, paint)
+                }
+                BossKind.POET -> shape(canvas, R.raw.boss_poet, enemy.position, enemy.radius, 0f,
+                    Color.argb(Color.alpha(color),117,117,110))
+                BossKind.CYPHER -> { paint.color = color; paint.style = Paint.Style.FILL; canvas.drawCircle(enemy.position.x,enemy.position.y,enemy.radius,paint) }
+                null -> error("Boss needs a kind")
+            }
             EnemyKind.DRONE -> return false
             EnemyKind.SPLITTER -> enemy.hitCircles().forEach { circle ->
                 if (enemy.deathAge == null || enemy.splitterHealth!!.partHealth[circle.part] == 0)
