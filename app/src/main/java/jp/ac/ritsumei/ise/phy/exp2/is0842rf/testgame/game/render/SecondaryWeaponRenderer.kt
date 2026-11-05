@@ -252,9 +252,8 @@ class SecondaryWeaponRenderer(context: Context) {
 
     fun drawArsenal(canvas: Canvas, world: CombatWorld, width: Float, height: Float) {
         val weapons = listOf(WeaponId.REPEATER) + world.secondaryWeapons.map { it.id }
-        val left = width / 2f - 67f
         for (slot in 0..4) {
-            val x = left + slot * 27f
+            val x = ArsenalLayout.left(width,slot)
             paint.style = Paint.Style.STROKE; paint.strokeWidth = 0.65f
             paint.color = Color.rgb(199, 199, 188)
             canvas.drawRoundRect(x, height - 29f, x + 23f, height - 6f, 2f, 2f, paint)

@@ -158,6 +158,54 @@ class LevelUpInstrumentedTest {
         } finally { instrumentation.runOnMainSync { activity.finish() } }
     }
 
+    @Test fun rewardRingsBlinkAndQueuedChoicesRenderOnPhone() {
+        val activity=launch()
+        try {
+            lateinit var arena:CombatView
+            instrumentation.runOnMainSync {
+                arena=activity.findViewById(R.id.combatArena);arena.stop()
+                arena.session.update((1.4-arena.session.presentationSeconds%1.4).toFloat())
+                arena.session.world.grantExperience(50);arena.session.update(0f)
+                arena.session.update(0.42f);arena.invalidate()
+            }
+            capture(activity,"reward-ring-contract.png")
+            instrumentation.runOnMainSync { arena.session.update(0.22f);arena.invalidate() }
+            capture(activity,"reward-ring-bounce-key-visible.png")
+            instrumentation.runOnMainSync { arena.session.update(0.39f);arena.invalidate() }
+            capture(activity,"reward-ring-release.png")
+            instrumentation.runOnMainSync { arena.session.update(0.37f);arena.invalidate() }
+            capture(activity,"reward-key-hidden.png")
+            instrumentation.runOnMainSync {
+                arena.session.world.acquireWeapon(WeaponId.HUNTER)
+                arena.session.world.weaponState(WeaponId.HUNTER)!!.creditKills(50)
+                arena.session.update(0f);arena.session.update(0.64f);arena.invalidate()
+            }
+            capture(activity,"reward-evolution-slot.png")
+            instrumentation.runOnMainSync {
+                val session=arena.session;assertTrue(arena.handleSpaceKey())
+                assertTrue(session.upgradeSelection!!.evolution)
+                val time=session.world.elapsedSeconds
+                val word=session.upgradeSelection!!.states[0].inputText
+                session.onInput(word.map { jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken.Stroke(it.toString()) },false)
+                session.update(0.26f)
+                assertNotNull(session.upgradeSelection);assertFalse(session.upgradeSelection!!.evolution)
+                assertEquals(time,session.world.elapsedSeconds,0.0)
+                assertTrue(session.upgradeSelection!!.states.all { it.matchedInputCharacters==0 })
+                arena.invalidate()
+            }
+            capture(activity,"reward-next-choice.png")
+            instrumentation.runOnMainSync {
+                val session=arena.session
+                val selection=session.upgradeSelection!!
+                val choice=selection.offers.indexOfFirst { it.effects.none { effect -> effect.stat==WeaponStat.EVOLUTION } }.coerceAtLeast(0)
+                session.onInput(selection.states[choice].inputText.map { jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken.Stroke(it.toString()) },false)
+                session.update(0.26f);assertNull(session.upgradeSelection)
+                session.update(0.12f);arena.invalidate()
+            }
+            capture(activity,"reward-evolution-applied.png")
+        } finally { instrumentation.runOnMainSync { activity.finish() } }
+    }
+
     private fun typeChoice(activity: CombatActivity) {
         instrumentation.runOnMainSync {
             val word = activity.findViewById<CombatView>(R.id.combatArena).session.upgradeSelection!!.words[0]
@@ -185,6 +233,12 @@ class LevelUpInstrumentedTest {
     }
 
     private fun capture(activity: CombatActivity, name: String) {
+        val committed=java.util.concurrent.CountDownLatch(1)
+        instrumentation.runOnMainSync {
+            val arena=activity.findViewById<CombatView>(R.id.combatArena)
+            arena.viewTreeObserver.registerFrameCommitCallback { committed.countDown() };arena.invalidate()
+        }
+        assertTrue(committed.await(3,java.util.concurrent.TimeUnit.SECONDS))
         SystemClock.sleep(250)
         instrumentation.waitForIdleSync()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()

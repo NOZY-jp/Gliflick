@@ -51,6 +51,11 @@ class CombatSession(
     val captions: List<EnemyCaption> get() = mutableCaptions
     val completions: List<CompletedCaption> get() = mutableCompletions
     val pickupCaptions: List<PickupCaption> get() = mutablePickupCaptions
+    private val mutableRewardFeedback = mutableListOf<RewardFeedback>()
+    val rewardFeedback: List<RewardFeedback> get() = mutableRewardFeedback
+    var presentationSeconds = 0.0; private set
+    private var notifiedLevel = world.level
+    private val notifiedEvolutions = mutableMapOf<WeaponId,Int>()
     var upgradeSelection: UpgradeSelection? = null; private set
     var rerollsRemaining = 3; private set
     val pendingEvolutionChoices get() = world.weaponStates.sumOf { it.pendingEvolutionChoices }
@@ -81,11 +86,17 @@ class CombatSession(
     }
 
     fun update(dt: Float) {
+        presentationSeconds += dt
+        mutableRewardFeedback.forEach { it.advance(dt) }
+        mutableRewardFeedback.removeAll { it.finished }
+        notifyRewards()
         upgradeSelection?.let { selection ->
             selection.advance(dt)?.let { offer ->
                 check(world.applyUpgrade(offer)) { "An offered upgrade must still be applicable." }
                 upgradeSelection = null
-                inputEpoch++
+                if (offer.kind == OfferKind.EVOLUTION) mutableRewardFeedback += RewardFeedback(offer.weapon)
+                notifyRewards()
+                if (!openNextReward(continuing = true)) inputEpoch++
             }
             return
         }
@@ -100,6 +111,7 @@ class CombatSession(
         }
         syncEvents()
         syncBossWords()
+        notifyRewards()
         mutableCaptions.forEach { caption ->
             caption.age += dt
             caption.fadeAge?.let { caption.fadeAge = it + dt }
@@ -111,18 +123,36 @@ class CombatSession(
         mutableCompletions.removeAll { it.progress >= 1f }
     }
 
-    /** Space opens one queued reward, or rerolls while a choice is already open. */
+    private fun notifyRewards() {
+        if (world.level > notifiedLevel) {
+            mutableRewardFeedback += RewardFeedback(null)
+            notifiedLevel = world.level
+        }
+        world.weaponStates.forEach { state ->
+            val unlocked = state.evolutionsChosen + state.pendingEvolutionChoices
+            if (unlocked > (notifiedEvolutions[state.id] ?: 0)) {
+                mutableRewardFeedback += RewardFeedback(state.id)
+                notifiedEvolutions[state.id] = unlocked
+            }
+        }
+    }
+
+    /** Space starts queued rewards; subsequent choices drain without resuming combat. */
     fun handleSpace(): Boolean {
         if (world.isGameOver || world.bosses.introduction != null) return false
         if (upgradeSelection != null) {
             rerollUpgrades()
             return true
         }
-        if (pendingChoiceCount == 0) return false
+        return openNextReward()
+    }
 
+    private fun openNextReward(continuing: Boolean = false): Boolean {
+        if (pendingChoiceCount == 0) return false
         val evolution = pendingEvolutionChoices > 0
         val selection = createReward(evolution) ?: return false
         if (!evolution && !world.consumeLevelUp()) return false
+        if (continuing) selection.revealImmediately()
         upgradeSelection = selection
         pendingTokens = emptyList()
         refreshStates()

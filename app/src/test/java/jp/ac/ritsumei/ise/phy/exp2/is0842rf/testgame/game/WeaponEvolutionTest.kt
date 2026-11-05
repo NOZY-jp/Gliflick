@@ -81,8 +81,7 @@ class WeaponEvolutionTest {
         assertTrue(s.upgradeSelection!!.offers.all { it.weapon == WeaponId.SPECTRE })
         repeat(3) {
             s.onInput(s.upgradeSelection!!.states[0].inputText.map { jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken.Stroke(it.toString()) }, false); repeat(200) { s.update(0.01f) }
-            assertNull(s.upgradeSelection)
-            assertTrue(s.handleSpace())
+            assertNotNull(s.upgradeSelection)
         }
         assertEquals(WeaponId.HUNTER, s.upgradeSelection!!.offers.first().weapon)
         assertEquals(1, s.pendingEvolutionChoices)

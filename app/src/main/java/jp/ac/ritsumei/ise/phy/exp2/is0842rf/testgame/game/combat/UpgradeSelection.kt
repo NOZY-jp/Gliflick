@@ -35,6 +35,9 @@ class UpgradeSelection(
         return selectedIndex != null
     }
 
+    /** A chained reward replaces the previous panel without exposing the paused arena. */
+    fun revealImmediately() { age = maxOf(age, 0.18f) }
+
     fun advance(dt: Float): UpgradeOffer? {
         age += dt
         if (selectedIndex != null) {

@@ -31,6 +31,8 @@
 - Oscillator motion work must read docs/OscillatorMotionDesign.md. Keep dense equal-speed particle emission, finite shortest-path aim rotation, and old emission headings at the outer wave; use those same particles for collision and rendering. Preserve Twin-Headed, Ball Lightning, and Stabilized Plasma behavior.
 - Kill-based evolution work must read docs/WeaponEvolutionDesign.md. All weapons use cumulative 50/150/300 credits and at most three choices per run, derived from the public demo's incremental 50/100/150 requirements. Keep pending rewards attributed to their weapon through rerolls. EvolutionCatalog owns branch eligibility; EvolutionEffects owns shared modifiers; controllers and actors own behavior. Do not offer branches whose required systems are absent. Additional glyph groups are allocated once across the run, not independently to every weapon.
 
+- After Space opens rewards, drain all queued evolution/level rewards automatically, prioritizing evolutions and never resuming combat between choices. Refresh the IME boundary for each new selection. RewardFeedback is presentation state; ArsenalLayout shares actual icon positions with evolution rings. Keep the blinking filled grey Space icon after the pending label/count.
+
 ## Bosses and pickups
 
 - Read docs/BossAndRerollDesign.md for boss/loot changes. CombatSession owns the exact 240-second encounter boundary and paused, typed-only go introduction; BossDirector owns individual boss behavior. Keep reward selection and boss introductions separate input generations. No game clocks advance behind either screen.

@@ -106,6 +106,7 @@ class CombatRenderer(context: Context) {
         drawTypingBonuses(canvas, session, width)
         secondaryRenderer.drawArsenal(canvas, world, width, height)
         bossRenderer.drawHud(canvas, session, width, height)
+        drawRewardFeedback(canvas,session,width,height)
         upgradeRenderer.draw(canvas, session, width, height)
         bossRenderer.drawIntroduction(canvas, session, width, height)
         if (world.isGameOver) {
@@ -114,6 +115,21 @@ class CombatRenderer(context: Context) {
             centered(canvas, "GAME OVER", width / 2f, height / 2f - 12f, 27f, ink)
             centered(canvas, "RETRY", width / 2f, height / 2f + 27f, 17f, ink)
         }
+    }
+
+    private fun drawRewardFeedback(canvas:Canvas,session:CombatSession,width:Float,height:Float) {
+        session.rewardFeedback.forEach { feedback ->
+            val center=feedback.weapon?.let { ArsenalLayout.center(session.world,it,width,height) }
+                ?: session.world.player.position
+            val target=if(feedback.weapon==null) session.world.player.radius+7f else 18f
+            val start=listOf(Vec2(0f,0f),Vec2(width,0f),Vec2(0f,height),Vec2(width,height))
+                .maxOf { (it-center).length() }+8f
+            val pose=feedback.pose(start,target)
+            paint.shader=null;paint.style=Paint.Style.STROKE;paint.strokeWidth=1.6f
+            paint.color=Color.rgb(151,151,143);paint.alpha=(255f*pose.alpha).toInt()
+            canvas.drawCircle(center.x,center.y,pose.radius,paint)
+        }
+        paint.alpha=255;paint.style=Paint.Style.FILL
     }
 
     private fun drawPlayer(canvas: Canvas, world: CombatWorld) {
@@ -166,26 +182,18 @@ class CombatRenderer(context: Context) {
         paint.textAlign = Paint.Align.LEFT
         canvas.drawText(label, x, baseline, paint)
         x += labelWidth + 4f
-        val top = baseline - keyHeight + 2f
-        paint.style = Paint.Style.FILL
-        paint.color = Color.rgb(247, 247, 239)
-        canvas.drawRoundRect(x, top, x + keyWidth, top + keyHeight, 2.5f, 2.5f, paint)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 0.8f
-        paint.color = Color.rgb(151, 151, 143)
-        canvas.drawRoundRect(x, top, x + keyWidth, top + keyHeight, 2.5f, 2.5f, paint)
-        paint.style = Paint.Style.FILL
-        paint.color = ink
-        paint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        paint.textSize = keySize
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("␣", x + keyWidth / 2f, top + 9.4f, paint)
-        x += keyWidth + 4f
-        paint.typeface = light
-        paint.textSize = labelSize
-        paint.textAlign = Paint.Align.LEFT
-        paint.color = muted
-        canvas.drawText(count, x, baseline, paint)
+        canvas.drawText(count,x,baseline,paint)
+        x += countWidth + 4f
+        val top=baseline-keyHeight+2f
+        val alpha=(255f*(0.5f-0.5f*cos((session.presentationSeconds*2.0*PI/1.4).toFloat()))).toInt()
+        paint.style=Paint.Style.FILL
+        paint.color=Color.rgb(151,151,143);paint.alpha=alpha
+        canvas.drawRoundRect(x,top,x+keyWidth,top+keyHeight,2.5f,2.5f,paint)
+        paint.color=Color.rgb(245,245,236);paint.alpha=alpha
+        paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
+        paint.textSize=keySize;paint.textAlign=Paint.Align.CENTER
+        canvas.drawText("␣",x+keyWidth/2f,top+9.4f,paint)
+        paint.alpha=255
         paint.style = Paint.Style.FILL
     }
 
