@@ -22,13 +22,14 @@ internal class GeminiEncounter(private val bodies: List<Enemy>,private val balan
     override fun update(world: CombatWorld,dt: Float) {
         val alive=bodies.filter { it.isAlive }
         if(alive.size==2) {
-            healCredit+=balance.geminiHp*balance.healFractionPerSecond*dt
+            healCredit+=balance.healHpPerSecond*dt
             val heal=healCredit.toInt();healCredit-=heal
             val highest=alive.maxOf { it.hp }
             alive.forEach { it.heal(min(heal,highest-it.hp)) }
         }
         attackClock+=dt
         tendril?.let {
+            it.counterPulseAge=it.counterPulseAge?.plus(dt)
             val retreat=it.retreatAge
             if(retreat!=null) {
                 it.retreatAge=retreat+dt
@@ -44,7 +45,7 @@ internal class GeminiEncounter(private val bodies: List<Enemy>,private val balan
         }
     }
     override fun counterTendril() { tendril?.let {
-        if(!it.finished) { it.strokes++;if(it.strokes>=it.required) it.retreatAge=0f }
+        if(!it.finished) { it.strokes++;it.counterPulseAge=0f;if(it.strokes>=it.required) it.retreatAge=0f }
     } }
     override fun finish(world:CombatWorld) { tendril=null;super.finish(world) }
 }

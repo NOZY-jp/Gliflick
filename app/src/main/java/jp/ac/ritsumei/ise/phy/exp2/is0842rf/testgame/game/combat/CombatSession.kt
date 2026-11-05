@@ -45,7 +45,13 @@ class CombatSession(
     private var poemWord: WordDefinition? = null
     var tendrilState: WordMatchState? = null; private set
     var poemState: WordMatchState? = null; private set
-    val bossIntroState get() = bossIntroPreview ?: bossIntroEngine?.snapshot()?.firstOrNull()
+    val bossIntroState get() = (bossIntroPreview ?: bossIntroEngine?.snapshot()?.firstOrNull())?.let {
+        it.copy(inputText="go",matchedInputCharacters=if(it.isCompleted)2 else if(it.inputText=="go")it.matchedInputCharacters else 0)
+    }
+    val tendrilInputText get() = tendrilState?.inputText ?: world.bosses.tendril?.glyph?.let {
+        if(engine.inputMode==jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.InputMode.ROMAJI)
+            jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.TypingLanguages.forTag("ja").defaultRoman(listOf(it)) else it
+    }
     private var wordVersion = 0L
     private var pendingTokens: List<InputToken> = emptyList()
     val captions: List<EnemyCaption> get() = mutableCaptions
@@ -105,7 +111,7 @@ class CombatSession(
             minOf(dt.toDouble(), (world.bosses.nextAppearanceAt - world.elapsedSeconds).coerceAtLeast(0.0)).toFloat() else dt
         world.update(step, typingBonuses.modifiers(engine.streak, world.elapsedSeconds))
         if (!world.isGameOver && world.bosses.requestIfDue(world.elapsedSeconds)) {
-            bossIntroEngine = WordMatchEngine(listOf(WordDefinition("boss-go", "go", languageTag = "en")), engine.inputMode)
+            bossIntroEngine = WordMatchEngine(listOf(WordDefinition("boss-go", "ご")), jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.language.InputMode.ROMAJI)
             pendingTokens = emptyList()
             inputEpoch++
         }

@@ -145,11 +145,12 @@ class SecondaryWeaponRenderer(context: Context) {
         world.pickups.forEach { pickup ->
             val p = pickup.position
             if (pickup.kind == PickupKind.REROLL) {
-                drawRerollCloud(canvas, pickup)
-                icons.drawReroll(canvas, p.x, p.y, 8f, ink(210))
+                icons.drawReroll(canvas, p.x, p.y, 4.8f, ink(210))
             } else if (pickup.kind == PickupKind.METEOR) actor(canvas, WeaponId.METEOR, p,
                 8f * WeaponSizeTuning.forWeapon(WeaponId.METEOR), pickup.age * 0.6f)
             else icons.drawFuel(canvas, p.x, p.y, 7f, ink(190), pickup.fuelBonus)
+            val scale=if(pickup.kind==PickupKind.REROLL)0.6f else 1f
+            canvas.save();canvas.scale(scale,scale,p.x,p.y)
             paint.style = Paint.Style.FILL; paint.color = Color.rgb(199, 199, 188)
             canvas.drawRect(p.x - 10f, p.y + 13f, p.x + 10f, p.y + 14.5f, paint)
             paint.color = ink
@@ -157,23 +158,29 @@ class SecondaryWeaponRenderer(context: Context) {
             paint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             paint.textSize = 8f; paint.textAlign = Paint.Align.CENTER
             if(pickup.kind != PickupKind.REROLL) canvas.drawText(pickup.kind.title + (pickup.fuelBonus?.let { "・${it.title}" } ?: ""), p.x, p.y + 25f, paint)
+            canvas.restore()
         }
         paint.alpha = 255; paint.style = Paint.Style.FILL
     }
 
+    fun drawRerollSparkles(canvas:Canvas,world:CombatWorld) {
+        world.pickups.filter { it.kind==PickupKind.REROLL }.forEach { drawRerollCloud(canvas,it) }
+    }
+
     private fun drawRerollCloud(canvas: Canvas, pickup: CombatPickup) {
-        val tick=(pickup.age*28f).toInt()
-        for(index in (tick-55).coerceAtLeast(0)..tick) {
-            val age=pickup.age-index/28f
+        val tick=(pickup.age*7f).toInt()
+        for(index in (tick-3).coerceAtLeast(0)..tick) {
+            val age=pickup.age-index/7f
             val seed=abs(sin(index*17.13f))
-            val lifetime=1.6f+seed*0.6f
+            val lifetime=0.18f+seed*0.10f
             if(age !in 0f..lifetime) continue
             val progress=age/lifetime
-            val angle=-PI.toFloat()/2f+sin(index*2.39996f)*1.0f
-            val speed=50f+seed*38f
-            val x=pickup.position.x+cos(angle)*speed*age+sin(age*3f+index)*age*3f
+            val side=if(index%2==0)1f else -1f
+            val angle=-PI.toFloat()/2f+side*(0.65f+seed*0.2f)
+            val speed=90f+seed*40f
+            val x=pickup.position.x+side*8f+cos(angle)*speed*age+sin(age*3f+index)*age*3f
             val y=pickup.position.y-4f+sin(angle)*speed*age-4f*age*age
-            val size=(1.0f+seed*1.5f)*sin(PI.toFloat()*progress).coerceAtLeast(0f)
+            val size=(2.4f+seed*2.2f)*sin(PI.toFloat()*progress).coerceAtLeast(0f)
             if(size<0.08f) continue
             val alpha=if(progress<0.7f)180 else (180*(1f-progress)/0.3f).toInt()
             paint.shader=null;paint.style=Paint.Style.FILL;paint.color=ink(alpha)

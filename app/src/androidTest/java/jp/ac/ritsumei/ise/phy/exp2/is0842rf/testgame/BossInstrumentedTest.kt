@@ -43,7 +43,14 @@ class BossInstrumentedTest {
             }
             capture(a,"gemini-introduction")
             instrumentation.runOnMainSync {
-                assertTrue(arena.session.onInput(tokens("go"),false))
+                val connection=a.findViewById<GameImeEditText>(R.id.combatInputHost).onCreateInputConnection(EditorInfo())!!
+                connection.setComposingText("g",1)
+            }
+            capture(a,"gemini-go-progress")
+            instrumentation.runOnMainSync {
+                val connection=a.findViewById<GameImeEditText>(R.id.combatInputHost).onCreateInputConnection(EditorInfo())!!
+                connection.setComposingText("ご",1)
+                assertEquals(BossKind.GEMINI,arena.session.world.bosses.activeKind)
                 val world=arena.session.world
                 world.damageEnemy(world.bosses.enemies[0].id,500);world.damageEnemy(world.bosses.enemies[1].id,800)
                 arena.session.update(0.8f)
@@ -53,10 +60,21 @@ class BossInstrumentedTest {
                 repeat(1450) { arena.session.update(1f/120f) }
                 val word=checkNotNull(arena.session.tendrilState).definition
                 val input=TypingLanguages.forTag(word.languageTag).defaultRoman(word.characters)
-                arena.session.onInput(tokens(input.repeat(10)),false)
-                assertEquals(10,arena.session.world.bosses.tendril!!.strokes)
+                arena.session.onInput(tokens(input.repeat(5)),false)
+                assertEquals(5,arena.session.world.bosses.tendril!!.strokes)
+                arena.session.update(0.05f)
+                assertTrue(arena.session.world.bosses.tendril!!.counterScale>1f)
             }
             capture(a,"gemini-tendril")
+            instrumentation.runOnMainSync {
+                val world=arena.session.world
+                val word=checkNotNull(arena.session.tendrilState).definition
+                arena.session.onInput(tokens(TypingLanguages.forTag(word.languageTag).defaultRoman(word.characters).repeat(5)),false)
+                assertEquals(10,world.bosses.tendril!!.strokes)
+                assertNotNull(world.bosses.tendril!!.retreatAge)
+                arena.session.update(0.05f)
+            }
+            capture(a,"gemini-tendril-repelled")
         } finally { instrumentation.runOnMainSync { a.finish() } }
     }
     @Test fun cypherAuraAndGeneratedKanaRenderTogether() {
@@ -120,6 +138,12 @@ class BossInstrumentedTest {
                 repeat(120) { arena.session.update(1f/120f) }
             }
             capture(a,"reroll-sparkling-dice")
+            instrumentation.runOnMainSync {
+                val word=arena.session.pickupCaptions.single().word
+                val input=TypingLanguages.forTag(word.languageTag).defaultRoman(word.characters)
+                a.findViewById<GameImeEditText>(R.id.combatInputHost).onCreateInputConnection(EditorInfo())!!.setComposingText(input.take(1),1)
+            }
+            capture(a,"reroll-input-progress")
             instrumentation.runOnMainSync {
                 val word=arena.session.pickupCaptions.single().word
                 val input=TypingLanguages.forTag(word.languageTag).defaultRoman(word.characters)

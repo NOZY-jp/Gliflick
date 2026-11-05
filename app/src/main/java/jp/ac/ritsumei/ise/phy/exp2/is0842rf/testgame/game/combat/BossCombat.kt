@@ -3,14 +3,21 @@ package jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.combat
 import kotlin.math.*
 import kotlin.random.Random
 
-/** Local arrival balance; kills are the drop opportunity, simulation time supplies the hazard. */
+/** Kill-gated random renewal: mean 120 seconds, with fewer short clustered intervals. */
 class RerollDropPolicy(val meanSeconds: Double = 120.0) {
+    private var nextDropAt: Double? = null
     private var previousDeath = 0.0
     init { require(meanSeconds > 0 && meanSeconds.isFinite()) }
+    private fun nextWait(random:Random):Double = (1..4).sumOf {
+        -ln1p(-random.nextDouble()) * (meanSeconds/4.0)
+    }
     fun onDeath(seconds: Double, random: Random): Boolean {
-        val elapsed = (seconds - previousDeath).coerceAtLeast(0.0)
-        previousDeath = max(previousDeath, seconds)
-        return elapsed > 0 && random.nextDouble() < -expm1(-elapsed / meanSeconds)
+        if(nextDropAt==null) nextDropAt=nextWait(random)
+        if(seconds<=previousDeath) return false
+        previousDeath=seconds
+        if(seconds<checkNotNull(nextDropAt)) return false
+        nextDropAt=seconds+nextWait(random)
+        return true
     }
 }
 
@@ -34,12 +41,12 @@ data class EnemyArrivalRules(
 
 data class BossBalance(
     val intervalSeconds: Double = 240.0,
-    val geminiHp: Int = 3000,
+    val geminiHp: Int = 12000,
     val cypherHp: Int = 5000,
-    val healFractionPerSecond: Float = 0.025f,
+    val healHpPerSecond: Float = 75f,
     val tendrilInterval: Float = 12f,
     val tendrilApproach: Float = 6f,
-    val tendrilStrokes: Int = 20,
+    val tendrilStrokes: Int = 10,
     val tendrilDamage: Int = 60,
     val poetShotInterval: Float = 5f,
     val poetShotSpeed: Float = 48f
@@ -52,6 +59,11 @@ class Tendril(val glyph: String, val duration: Float, val required: Int) {
     var age = 0f
     var strokes = 0
     var retreatAge: Float? = null
+    var counterPulseAge: Float? = null
+    val counterScale get() = counterPulseAge?.let {
+        val t=(it/0.22f).coerceIn(0f,1f)
+        1f+0.32f*sin(PI.toFloat()*t)*(1f-t)
+    } ?: 1f
     val progress get() = (age / duration).coerceIn(0f, 1f)
     val finished get() = strokes >= required || age >= duration
 }
@@ -116,7 +128,11 @@ class BossDirector(val balance: BossBalance = BossBalance()) {
             }
             val definition = EnemyDefinition(kind = EnemyKind.BOSS, bossKind = kind, maxHp = hp,
                 speed = 0f, contactDamage = 0, radius = radius, collisionRadius=if(kind==BossKind.CYPHER)5f else radius,
-                behaviorFactory = { if(kind == BossKind.CYPHER) CypherWander { Vec2(world.width,world.height) } else EnemyBehavior { _, _, _ -> } })
+                behaviorFactory = { when(kind) {
+                    BossKind.CYPHER -> CypherWander { Vec2(world.width,world.height) }
+                    BossKind.GEMINI -> GeminiFloat(index) { Vec2(world.width,world.height) }
+                    BossKind.POET -> EnemyBehavior { _, _, _ -> }
+                } })
             bodies += world.spawnEnemy(position, definition).also { it.cyphered=kind==BossKind.CYPHER }
         }
         behavior = when(kind) {
@@ -156,5 +172,17 @@ private class CypherWander(private val bounds:()->Vec2): EnemyBehavior {
         age += dt
         val size=bounds();val width=size.x;val height=size.y
         enemy.position = Vec2(width * (0.5f + 0.25f * sin(age * 0.35f)), height * (0.27f + 0.12f * sin(age * 0.28f)))
+    }
+}
+
+/** Physical and caption positions float together; no renderer-only hitbox offset. */
+private class GeminiFloat(private val index:Int,private val bounds:()->Vec2):EnemyBehavior {
+    private var age=0f
+    override fun update(enemy:Enemy,dt:Float,playerPosition:Vec2) {
+        age+=dt
+        val size=bounds();val phase=if(index==0) 0f else PI.toFloat()
+        enemy.position=Vec2(size.x*(if(index==0)0.16f else 0.84f)+4f*sin(age*0.85f+phase),
+            size.y*0.43f+6f*sin(age*1.2f+phase))
+        enemy.angle=atan2(playerPosition.y-enemy.position.y,playerPosition.x-enemy.position.x)
     }
 }

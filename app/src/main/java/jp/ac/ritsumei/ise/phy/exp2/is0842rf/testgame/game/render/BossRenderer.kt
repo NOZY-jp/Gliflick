@@ -70,10 +70,12 @@ class BossRenderer {
     }
     fun drawHud(canvas: Canvas, session: CombatSession, width: Float, height: Float) {
         val world=session.world;val bosses=world.bosses
-        bosses.tendril?.takeUnless { it.finished }?.let { attack ->
+        bosses.tendril?.takeIf { !it.finished || it.retreatAge!=null }?.let { attack ->
             val tip=world.player.position+Vec2(0f,-90f*(1f-attack.progress))
+            canvas.save();canvas.scale(attack.counterScale,attack.counterScale,tip.x,tip.y)
             paint.color=gray;paint.style=Paint.Style.FILL;canvas.drawCircle(tip.x,tip.y,10f,paint)
-            text(canvas,session.tendrilState?.inputText ?: attack.glyph,tip.x,tip.y+4f,12f,Color.rgb(245,245,236))
+            text(canvas,session.tendrilInputText ?: attack.glyph,tip.x,tip.y+4f,12f,Color.rgb(245,245,236))
+            canvas.restore()
 
         }
         session.poemState?.let { state ->

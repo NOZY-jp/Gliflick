@@ -227,7 +227,7 @@ class CombatWorld(
     fun addEffect(effect: WeaponEffect) { if (mutableEffects.size < 160) mutableEffects += effect }
     fun hasPickup(kind: PickupKind) = pickups.any { it.kind == kind }
     fun spawnPickup(kind: PickupKind, position: Vec2, fuelBonus: WeaponStat? = null): CombatPickup {
-        val pickup = CombatPickup(nextPickupId++, kind, position, lifetime = if(kind == PickupKind.REROLL) 30f else 14f, fuelBonus = fuelBonus)
+        val pickup = CombatPickup(nextPickupId++, kind, position, lifetime = if(kind == PickupKind.REROLL) 10f else 14f, fuelBonus = fuelBonus)
         mutablePickups += pickup
         events += CombatEvent.PickupSpawned(pickup)
         return pickup

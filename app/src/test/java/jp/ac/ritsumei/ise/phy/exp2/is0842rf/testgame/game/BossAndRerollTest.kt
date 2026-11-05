@@ -21,6 +21,60 @@ class BossAndRerollTest {
         assertTrue("Expected about 1000 drops, got $drops",drops in 920..1080)
         repeat(1000) { assertFalse(policy.onDeath(120000.0,random)) }
     }
+    @Test fun twoMinuteRateIsIndependentOfKillFrequencyAndShortClustersAreRare() {
+        for(step in listOf(0.1,1.0,5.0)) {
+            val policy=RerollDropPolicy();val random=Random(56)
+            var drops=0;var short=0;var last=0.0
+            repeat((240000/step).toInt()) { index ->
+                val t=(index+1)*step
+                if(policy.onDeath(t,random)) { drops++;if(t-last<30)short++;last=t }
+            }
+            assertTrue("step=$step drops=$drops",drops in 1840..2100)
+            assertTrue("short intervals=$short / $drops",short<drops*0.05)
+        }
+        val policy=RerollDropPolicy();val random=Random(2)
+        assertTrue(policy.onDeath(100000.0,random))
+        repeat(1000) { assertFalse(policy.onDeath(100000.0,random)) }
+        assertFalse(policy.onDeath(100000.000001,random))
+    }
+    @Test fun goCommandAcceptsRomanKanaAndImeCompositionWithoutChangingCombatStreak() {
+        for(form in listOf("go","ご","composition")) {
+            val w=world(BossDirector(BossBalance(intervalSeconds=1.0)))
+            val s=CombatSession(words,w,Random(3));s.resize(400f,600f);s.update(1f)
+            assertEquals("go",s.bossIntroState!!.inputText)
+            if(form=="composition") {
+                val decoder=jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.input.ImeStrokeDecoder()
+                val partial=decoder.composing("g");assertFalse(s.onInput(partial.tokens,partial.composing))
+                assertEquals("go",s.bossIntroState!!.inputText)
+                val kana=decoder.composing("ご");assertTrue(s.onInput(kana.tokens,kana.composing))
+            } else assertTrue(s.onInput(tokens(form),false))
+            assertEquals(BossKind.GEMINI,w.bosses.activeKind)
+            assertEquals(0,s.streak);assertEquals(0,(w.mainWeapon as Repeater).pendingShots)
+        }
+    }
+    @Test fun geminiFloatsWithItsCaptionsAndEveryAcceptedMashRestartsThePulse() {
+        val w=world();w.bosses.begin(w,BossKind.GEMINI)
+        val s=CombatSession(words,w,Random(3));s.resize(400f,600f);s.update(0f)
+        val start=w.bosses.enemies.map { it.position }
+        s.update(0.5f)
+        w.bosses.enemies.forEachIndexed { index,enemy ->
+            assertNotEquals(start[index],enemy.position)
+            assertTrue((start[index]-enemy.position).length()<8f)
+            assertEquals(enemy.position,s.captions.single { it.enemyId==enemy.id }.anchor)
+        }
+        repeat(1440) { s.update(1f/120f) }
+        repeat(9) { index ->
+            val word=checkNotNull(s.tendrilState).definition
+            assertTrue(s.onInput(tokens(spelling(word)),false))
+            assertEquals(index+1,w.bosses.tendril!!.strokes)
+            assertEquals(0f,w.bosses.tendril!!.counterPulseAge!!,0f)
+            s.update(0.05f);assertTrue(w.bosses.tendril!!.counterScale>1f)
+        }
+        s.onInput(tokens(spelling(checkNotNull(s.tendrilState).definition)),false)
+        assertEquals(10,w.bosses.tendril!!.strokes)
+        assertNotNull(w.bosses.tendril!!.retreatAge)
+        s.update(0.05f);assertTrue(w.bosses.tendril!!.counterScale>1f)
+    }
     @Test fun aKillDropsAtTheEnemyPositionAndSameFrameKillsDoNotCreateABatch() {
         val w=CombatWorld(CombatConfig(),Random(3),rerollDrops=RerollDropPolicy(0.000001),
             spawnDensity=EnemySpawnDensity { _,_,_,_ -> false }).also { it.resize(400f,600f) }
@@ -42,7 +96,8 @@ class BossAndRerollTest {
         assertEquals(0,(w.mainWeapon as Repeater).pendingShots)
         w.activatePickup(pickup.id);session.update(0f);assertEquals(4,session.rerollsRemaining)
         w.spawnPickup(PickupKind.REROLL,Vec2(80f,300f));session.update(0f)
-        session.update(31f);assertTrue(session.pickupCaptions.isEmpty())
+        session.update(9.99f);assertEquals(1,session.pickupCaptions.size)
+        session.update(0.02f);assertTrue(session.pickupCaptions.isEmpty())
     }
     @Test fun introductionFreezesEveryClockAndOnlyTypedGoStartsTheNextBoss() {
         val director=BossDirector(BossBalance(intervalSeconds=1.0));val w=world(director)
@@ -69,19 +124,19 @@ class BossAndRerollTest {
         assertTrue(w.pickups.isEmpty())
     }
 
-    @Test fun geminiHealsOnlyTheLowerPartnerAndTwentySharedMatcherHitsRepelTheTendril() {
+    @Test fun geminiHealsOnlyTheLowerPartnerAndTenSharedMatcherHitsRepelTheTendril() {
         val w=world();w.bosses.begin(w,BossKind.GEMINI)
         val (a,b)=w.bosses.enemies
         w.damageEnemy(a.id,500);w.update(1f)
-        assertTrue(a.hp>2500);assertEquals(3000,b.hp)
+        assertEquals(12000,a.definition.maxHp);assertTrue(a.hp>11500);assertEquals(12000,b.hp)
         w.damageEnemy(a.id,300);w.damageEnemy(b.id,b.hp-a.hp)
         val equal=a.hp;w.update(1f);assertEquals(equal,a.hp);assertEquals(equal,b.hp)
         val session=CombatSession(words,w,Random(5));session.resize(400f,600f)
         repeat(1202) { session.update(1f/120f) }
         assertNotNull(session.tendrilState)
         val command=spelling(session.tendrilState!!.definition)
-        assertTrue(session.onInput(tokens(command.repeat(20)),false))
-        assertEquals(20,w.bosses.tendril!!.strokes)
+        assertTrue(session.onInput(tokens(command.repeat(10)),false))
+        assertEquals(10,w.bosses.tendril!!.strokes)
         assertNotNull(w.bosses.tendril!!.retreatAge)
         val hp=w.player.hp
         session.update(0.1f);assertNotNull(w.bosses.tendril)
