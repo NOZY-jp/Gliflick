@@ -25,8 +25,11 @@ class EnemyRenderer(private val context: Context) {
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 0.65f
         paint.color = Color.argb(70, 117, 117, 110)
+        world.barriers.filter(world::isWarderAuraActive).forEach { barrier ->
+            canvas.drawCircle(barrier.owner.position.x,barrier.owner.position.y,barrier.protectionRadius,paint)
+        }
         world.enemies.filter(world::isProtected).forEach { enemy ->
-            world.barriers.filter { it.isAlive && (enemy.position - it.owner.position).length() < it.protectionRadius }
+            world.barriers.filter { world.isWarderAuraActive(it) && (enemy.position - it.owner.position).length() < it.protectionRadius }
                 .forEach { canvas.drawLine(it.owner.position.x, it.owner.position.y, enemy.position.x, enemy.position.y, paint) }
             canvas.drawCircle(enemy.position.x, enemy.position.y, enemy.radius + 3f, paint)
         }
@@ -55,7 +58,7 @@ class EnemyRenderer(private val context: Context) {
                 }
                 BossKind.POET -> shape(canvas, R.raw.boss_poet, enemy.position, enemy.radius, 0f,
                     Color.argb(Color.alpha(color),117,117,110))
-                BossKind.CYPHER -> { paint.color = color; paint.style = Paint.Style.FILL; canvas.drawCircle(enemy.position.x,enemy.position.y,enemy.radius,paint) }
+                BossKind.CYPHER -> { paint.color = color; paint.style = Paint.Style.FILL; canvas.drawCircle(enemy.position.x,enemy.position.y,enemy.definition.collisionRadius,paint) }
                 null -> error("Boss needs a kind")
             }
             EnemyKind.DRONE -> return false

@@ -305,7 +305,7 @@ class CombatSession(
         var text: String
         do { text = (0 until normal.readingLength).joinToString("") { kana[random.nextInt(kana.length)].toString() } }
         while (text == normal.text)
-        return WordDefinition("cipher-${wordVersion++}", text, "暗号")
+        return WordDefinition("cipher-${wordVersion++}", text, text)
     }
 
     private fun syncBossWords() {

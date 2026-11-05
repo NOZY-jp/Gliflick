@@ -483,7 +483,7 @@ class CombatWorld(
         val livingCount = livingPopulation
         if (config.spawningEnabled && livingCount < config.maxEnemiesAlive &&
             arrivalCapacity(enemies, config.maxEnemiesAlive) > 0 &&
-            spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random, enemies)) {
+            spawnDensity.shouldSpawn(dt * bosses.arrivalRules.rateMultiplier, elapsedSeconds, level, random, enemies)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level, random, enemies)
             if ((definition.splitter?.partCount ?: 1) <= arrivalCapacity(enemies, config.maxEnemiesAlive))
                 spawnEnemy(spawnPosition(definition.radius * definition.size), definition)
@@ -491,8 +491,10 @@ class CombatWorld(
         bosses.update(this, dt)
     }
 
+    fun isWarderAuraActive(barrier: WarderBarrier): Boolean = barrier.isAlive && !outside(barrier.owner.position,barrier.owner.radius)
+
     fun isProtected(enemy: Enemy): Boolean = enemy.definition.bossKind == null && enemy.definition.kind != EnemyKind.WARDER && enemy.isAlive &&
-        barriers.any { it.isAlive && !outside(it.owner.position, it.owner.radius) &&
+        barriers.any { isWarderAuraActive(it) &&
             (enemy.position - it.owner.position).length() < it.protectionRadius }
 
     private fun outside(point: Vec2, margin: Float = 32f) =
@@ -595,11 +597,13 @@ class CombatWorld(
             val high = (limit - margin).coerceAtLeast(low)
             return if (high <= low) limit / 2f else low + random.nextFloat() * (high - low)
         }
-        fun candidate(): Vec2 = when (random.nextInt(4)) {
-            0 -> Vec2(across(width), -margin)
-            1 -> Vec2(width + margin, across(height))
-            2 -> Vec2(across(width), height + margin)
-            else -> Vec2(-margin, across(height))
+        val rules=bosses.arrivalRules
+        val edge=if(rules.chooseEdgeOnce) rules.edges[random.nextInt(rules.edges.size)] else null
+        fun candidate(): Vec2 = when (edge ?: rules.edges[random.nextInt(rules.edges.size)]) {
+            ArrivalEdge.TOP -> Vec2(across(width), -margin)
+            ArrivalEdge.RIGHT -> Vec2(width + margin, across(height))
+            ArrivalEdge.BOTTOM -> Vec2(across(width), height + margin)
+            ArrivalEdge.LEFT -> Vec2(-margin, across(height))
         }
         return List(32) { candidate() }.maxBy { point ->
             minOf((point - player.position).length(),

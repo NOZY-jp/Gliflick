@@ -71,6 +71,12 @@ class BossInstrumentedTest {
                 assertTrue(arena.session.captions.any { it.cyphered })
             }
             capture(a,"cypher-aura")
+            instrumentation.runOnMainSync {
+                val arena=a.findViewById<CombatView>(R.id.combatArena)
+                repeat(8) { arena.session.update(1f/120f) }
+                assertTrue(arena.session.captions.filter { it.cyphered }.all { it.word.displayName==it.word.text })
+            }
+            capture(a,"cypher-aura-next")
         } finally { instrumentation.runOnMainSync { a.finish() } }
     }
     @Test fun poetPassageAndSquaredCaptionsRenderOnThePhone() {
@@ -89,6 +95,19 @@ class BossInstrumentedTest {
                 assertEquals(3,world.bosses.poemIndex)
             }
             capture(a,"poet-passage-and-seal")
+        } finally { instrumentation.runOnMainSync { a.finish() } }
+    }
+    @Test fun warderProtectionRadiusIsVisibleEvenBeforeAnyEnemyIsProtected() {
+        val a=launch()
+        try {
+            instrumentation.runOnMainSync {
+                val arena=a.findViewById<CombatView>(R.id.combatArena);val world=arena.session.world
+                val owner=world.spawnEnemy(world.player.position+Vec2(60f,-50f),EnemyCatalog.definition(EnemyKind.WARDER))
+                world.spawnEnemy(owner.position+Vec2(-45f,80f),EnemyDefinition(maxHp=10000,speed=0f))
+                repeat(60) { arena.session.update(1f/120f) }
+                assertTrue(world.barriers.any(world::isWarderAuraActive))
+            }
+            capture(a,"warder-protection-radius")
         } finally { instrumentation.runOnMainSync { a.finish() } }
     }
     @Test fun sparklingDiceCanBeCollectedThroughTheRealInputConnection() {

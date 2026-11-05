@@ -29,7 +29,7 @@ import kotlin.math.min
 /** Presentation only: no matching, damage, spawning, or weapon timing. Coordinates are logical dp. */
 class CombatRenderer(context: Context) {
     private val enemyRenderer = EnemyRenderer(context)
-    private val bossRenderer = BossRenderer(context)
+    private val bossRenderer = BossRenderer()
     private val chips = TypingChipRenderer()
     private val secondaryRenderer = SecondaryWeaponRenderer(context)
     private val upgradeRenderer = UpgradeRenderer(context)
@@ -79,6 +79,7 @@ class CombatRenderer(context: Context) {
             paint.color = enemyRed
             paint.alpha = alpha
             drawEnemyBody(canvas, enemy)
+            bossRenderer.drawBodyDetails(canvas,enemy,world.elapsedSeconds)
             drawEnemyHealthBar(canvas, enemy, alpha, enemy.spawnOrigin.y < world.height / 2f)
         }
         enemyRenderer.drawBarriers(canvas, world)
@@ -397,11 +398,11 @@ class CombatRenderer(context: Context) {
         fun add(state: WordMatchState, anchor: Vec2, alpha: Float, scale: Float,
                 below: Boolean, radius: Float, owner: Long, enemy: Enemy?, chip: Boolean = false) {
             if (alpha <= 0f) return
-            val geometry = captionGeometry(state, anchor, scale, width, height, below, radius)
+            val geometry = captionGeometry(state, anchor, scale, width, height, below, radius, chip)
             val priority = CaptionPriority(!state.isCompleted && state.matchedInputCharacters > 0,
                 enemy?.let { (it.definition.maxHp - it.hp).toDouble() / it.definition.maxHp } ?: 0.0,
                 enemy?.definition?.tier ?: 0, enemy?.id ?: if (owner > 0) owner else -owner)
-            layers += CaptionLayer(owner, priority, if(chip) geometry.boxes.take(1).map { CaptionTextBox(it.left-8f,it.top-4f,it.right+8f,it.bottom+4f) } else geometry.boxes, CaptionDraw(state, alpha, geometry, enemy?.wordSealed == true, chip))
+            layers += CaptionLayer(owner, priority, if(chip) geometry.boxes.mapIndexed { index,box -> if(index==0) CaptionTextBox(box.left-8f,box.top-4f,box.right+8f,box.bottom+4f) else box } else geometry.boxes, CaptionDraw(state, alpha, geometry, enemy?.wordSealed == true, chip))
         }
         session.captions.forEach {
             add(it.state, it.anchor, it.alpha, 1f, it.placeBelowEnemy, it.radius, it.enemyId, it.enemy)
@@ -418,7 +419,7 @@ class CombatRenderer(context: Context) {
     }
 
     private fun captionGeometry(state: WordMatchState, anchor: Vec2, scale: Float,
-                                width: Float, height: Float, below: Boolean, radius: Float): CaptionGeometry {
+                                width: Float, height: Float, below: Boolean, radius: Float, chip:Boolean=false): CaptionGeometry {
         val characters = splitTextCharacters(state.inputText)
         paint.typeface = light
         paint.textSize = 17f
@@ -437,8 +438,9 @@ class CombatRenderer(context: Context) {
         if (naturalLabelWidth > maxWidth) paint.textSize *= maxWidth / naturalLabelWidth
         val labelSize = paint.textSize
         val labelWidth = paint.measureText(state.definition.displayName)
-        val label = CaptionTextBox(anchor.x - labelWidth / 2f, centerY - 16f + paint.fontMetrics.ascent,
-            anchor.x + labelWidth / 2f, centerY - 16f + paint.fontMetrics.descent)
+        val labelBaseline=centerY-if(chip)20f else 16f
+        val label = CaptionTextBox(anchor.x - labelWidth / 2f, labelBaseline + paint.fontMetrics.ascent,
+            anchor.x + labelWidth / 2f, labelBaseline + paint.fontMetrics.descent)
         val boxes = listOf(reading, label).mapNotNull { box ->
             val left = max(0f, anchor.x + (box.left - anchor.x) * scale)
             val right = min(width, anchor.x + (box.right - anchor.x) * scale)
@@ -455,6 +457,10 @@ class CombatRenderer(context: Context) {
         if(caption.chip) {
             chips.draw(canvas,state,geometry.centerX,geometry.wordBaseline,geometry.wordWidth+24f,geometry.wordSize,
                 alpha=caption.alpha*if(subdued)0.32f else 1f)
+            paint.style=Paint.Style.FILL;paint.typeface=light;paint.textSize=geometry.labelSize
+            paint.textAlign=Paint.Align.CENTER;paint.color=muted
+            paint.alpha=(255f*caption.alpha*if(subdued)0.32f else 1f).toInt().coerceIn(0,255)
+            canvas.drawText(state.definition.displayName,geometry.centerX,geometry.centerY-20f,paint)
             return
         }
         if(caption.sealed) {

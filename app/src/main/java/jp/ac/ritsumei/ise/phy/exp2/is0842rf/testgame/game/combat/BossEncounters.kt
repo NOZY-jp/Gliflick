@@ -4,6 +4,7 @@ import kotlin.math.min
 
 /** A new boss adds its own controller without adding combat/input logic to the director or renderer. */
 internal interface BossEncounterBehavior {
+    val arrivalRules:EnemyArrivalRules get()=EnemyArrivalRules.NORMAL
     val tendril: Tendril? get() = null
     val orbs: List<PoetOrb> get() = emptyList()
     val poemIndex: Int get() = 0
@@ -58,6 +59,7 @@ internal class CypherEncounter(private val bodies:List<Enemy>):BossEncounterBeha
 }
 
 internal class PoetEncounter(private val bodies:List<Enemy>,private val balance:BossBalance):BossEncounterBehavior {
+    override val arrivalRules=EnemyArrivalRules(0.75f,listOf(ArrivalEdge.RIGHT,ArrivalEdge.BOTTOM,ArrivalEdge.LEFT),chooseEdgeOnce=true)
     private val mutableOrbs=mutableListOf<PoetOrb>()
     override val orbs:List<PoetOrb> get()=mutableOrbs
     override var poemIndex=0;private set

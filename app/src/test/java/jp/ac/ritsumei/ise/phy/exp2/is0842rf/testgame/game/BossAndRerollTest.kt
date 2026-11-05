@@ -99,6 +99,7 @@ class BossAndRerollTest {
         val cipher=session.captions.single { it.enemyId==inside.id }
         assertTrue(cipher.cyphered);assertEquals(cipher.normalWord.readingLength,cipher.word.readingLength)
         assertNotEquals(cipher.normalWord.text,cipher.word.text)
+        assertEquals(cipher.word.text,cipher.word.displayName)
         assertFalse(session.captions.single { it.enemyId==outside.id }.cyphered)
         val mistakes=session.mistypeCount
         inside.position=Vec2(390f,550f);session.update(0f)
@@ -130,6 +131,58 @@ class BossAndRerollTest {
         assertEquals(Vec2(200f,101f),w.bosses.enemies.single().position)
         assertTrue(w.bosses.enemies.single().hitCircles().isEmpty())
         assertNull(w.nearestEnemy(w.player.position))
+    }
+
+    @Test fun poetScalesArrivalExposureOnlyAndRestoresItAfterDefeat() {
+        val exposure=mutableListOf<Float>()
+        val w=CombatWorld(CombatConfig(),Random(4),spawnDensity=EnemySpawnDensity { dt,_,_,_ -> exposure+=dt;false })
+            .also { it.resize(400f,600f) }
+        w.update(0.1f);assertEquals(0.1f,exposure.last(),0.000001f)
+        w.bosses.begin(w,BossKind.POET);w.update(0.1f)
+        assertEquals(0.075f,exposure.last(),0.000001f)
+        assertEquals(0.2,w.elapsedSeconds,0.000001)
+        repeat(PoetPassage.phrases.size) { w.bosses.completePhrase(w) }
+        w.update(0f);w.update(0.1f)
+        assertEquals(0.1f,exposure.last(),0.000001f)
+        assertEquals(EnemyArrivalRules.NORMAL,w.bosses.arrivalRules)
+    }
+
+    @Test fun poetNaturalArrivalsUseAllThreeEdgesAndNeverTheTop() {
+        val w=CombatWorld(CombatConfig(progression=ProgressionDefinition(killExperience=0)),Random(46),
+            spawnPolicy=FixedEnemySpawnPolicy(EnemyDefinition(speed=0f)),
+            spawnDensity=EnemySpawnDensity { _,_,_,_ -> true }).also { it.resize(400f,600f) }
+        w.bosses.begin(w,BossKind.POET)
+        val edges=mutableSetOf<ArrivalEdge>()
+        repeat(240) {
+            w.update(1f/120f)
+            w.drainEvents().filterIsInstance<CombatEvent.Spawned>().filter { it.enemy.definition.bossKind==null }.forEach { event ->
+                val point=event.enemy.spawnOrigin
+                assertTrue("Top arrival is forbidden during Poet: $point",point.y>=0f)
+                edges+=when {
+                    point.x<0f -> ArrivalEdge.LEFT
+                    point.x>w.width -> ArrivalEdge.RIGHT
+                    point.y>w.height -> ArrivalEdge.BOTTOM
+                    else -> error("Natural arrival must be outside an allowed edge: $point")
+                }
+                w.damageEnemy(event.enemy.id,100000)
+            }
+            assertTrue(w.livingPopulation<=16)
+        }
+        assertEquals(setOf(ArrivalEdge.LEFT,ArrivalEdge.RIGHT,ArrivalEdge.BOTTOM),edges)
+    }
+
+    @Test fun warderAuraVisibilityUsesTheSameLifetimeAndBoundsAsInvulnerability() {
+        val w=world()
+        val owner=w.spawnEnemy(Vec2(200f,240f),EnemyCatalog.definition(EnemyKind.WARDER))
+        val barrier=w.barriers.single()
+        val target=w.spawnEnemy(Vec2(280f,240f),EnemyDefinition(speed=0f))
+        assertTrue(w.isWarderAuraActive(barrier));assertTrue(w.isProtected(target))
+        owner.position=Vec2(-owner.radius-1f,240f);target.position=owner.position+Vec2(100f,0f)
+        assertFalse(w.isWarderAuraActive(barrier));assertFalse(w.isProtected(target))
+        owner.position=Vec2(25f,240f)
+        assertTrue(w.isWarderAuraActive(barrier));assertTrue(w.isProtected(target))
+        w.damageEnemy(owner.id,100000)
+        assertFalse(w.isWarderAuraActive(barrier));assertFalse(w.isProtected(target))
     }
 
     @Test fun poetOrbsTravelBeforeSealingAndOnlyTheWholePassageDefeatsItsBody() {

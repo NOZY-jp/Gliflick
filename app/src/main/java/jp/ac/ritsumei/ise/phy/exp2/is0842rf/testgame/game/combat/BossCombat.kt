@@ -20,6 +20,18 @@ enum class BossKind(val title: String, val description: List<String>) {
     POET("詩人", listOf("詩の響きに魅入られた怪人", "最後までタイプし続けろ", "敵を強化する弾に注意せよ"))
 }
 
+enum class ArrivalEdge { TOP, RIGHT, BOTTOM, LEFT }
+
+/** Natural-arrival rules are separate from enemy attacks, movement, and simulation time. */
+data class EnemyArrivalRules(
+    val rateMultiplier: Float = 1f,
+    val edges: List<ArrivalEdge> = ArrivalEdge.entries,
+    val chooseEdgeOnce: Boolean = false
+) {
+    init { require(rateMultiplier>=0f && rateMultiplier.isFinite() && edges.isNotEmpty() && edges.distinct().size==edges.size) }
+    companion object { val NORMAL=EnemyArrivalRules() }
+}
+
 data class BossBalance(
     val intervalSeconds: Double = 240.0,
     val geminiHp: Int = 3000,
@@ -75,6 +87,7 @@ class BossDirector(val balance: BossBalance = BossBalance()) {
     private val bodies = mutableListOf<Enemy>()
     private var behavior: BossEncounterBehavior? = null
     val enemies: List<Enemy> get() = bodies
+    val arrivalRules get() = if(activeKind!=null) behavior?.arrivalRules ?: EnemyArrivalRules.NORMAL else EnemyArrivalRules.NORMAL
     val tendril get() = behavior?.tendril
     val orbs get() = behavior?.orbs.orEmpty()
     val poemIndex get() = behavior?.poemIndex ?: 0
@@ -95,14 +108,14 @@ class BossDirector(val balance: BossBalance = BossBalance()) {
         val count = if (kind == BossKind.GEMINI) 2 else 1
         repeat(count) { index ->
             val hp = when(kind) { BossKind.GEMINI -> balance.geminiHp; BossKind.CYPHER -> balance.cypherHp; BossKind.POET -> 1 }
-            val radius = when(kind) { BossKind.GEMINI -> min(24f, world.width * 0.065f); BossKind.CYPHER -> 5f; BossKind.POET -> 23f }
+            val radius = when(kind) { BossKind.GEMINI -> min(24f, world.width * 0.065f); BossKind.CYPHER -> 18f; BossKind.POET -> 23f }
             val position = when(kind) {
                 BossKind.GEMINI -> Vec2(world.width * if(index == 0) 0.16f else 0.84f, world.height * 0.43f)
                 BossKind.CYPHER -> Vec2(world.width * 0.5f, world.height * 0.27f)
                 BossKind.POET -> Vec2(world.width / 2f, 101f.coerceAtMost(world.height * 0.24f))
             }
             val definition = EnemyDefinition(kind = EnemyKind.BOSS, bossKind = kind, maxHp = hp,
-                speed = 0f, contactDamage = 0, radius = radius,
+                speed = 0f, contactDamage = 0, radius = radius, collisionRadius=if(kind==BossKind.CYPHER)5f else radius,
                 behaviorFactory = { if(kind == BossKind.CYPHER) CypherWander { Vec2(world.width,world.height) } else EnemyBehavior { _, _, _ -> } })
             bodies += world.spawnEnemy(position, definition).also { it.cyphered=kind==BossKind.CYPHER }
         }
