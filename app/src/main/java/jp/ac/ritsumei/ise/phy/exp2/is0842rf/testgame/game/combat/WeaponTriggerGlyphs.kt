@@ -10,7 +10,7 @@ object WeaponTriggerGlyphs {
     const val ORBITER = "nop"
     val extraGroups = listOf("yz", "w")
     val startingGroups get() = listOf(TESLA, MINEFIELD, BLADE, ORBITER) + extraGroups
-    const val ROMAN_REFERENCE = "ワンストローク入力モードのローマ字表記"
-    fun startingCondition(letters: String) = "${ROMAN_REFERENCE}で ${label(letters)} のいずれかから始まる語"
+    const val ROMAN_REFERENCE = "読みの標準ローマ字表記"
+    fun startingCondition(letters: String) = "${ROMAN_REFERENCE}が ${label(letters)} のいずれかで始まる語"
     fun label(letters: String) = letters.toList().joinToString("・")
 }
