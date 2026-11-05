@@ -34,6 +34,10 @@
 - When changing enemy or weapon silhouettes, compare each tier's actual Android rendering beside the cited source image at the same heading and scale. A successful draw/screenshot test does not verify the reference geometry.
 - Preserve the placement, spacing and orientation of separate components. For Shooters, the extra chevrons are ahead of the main body, not rear fins. Use the reference-traced `enemy_shooter_*.svg` and their measured visual radii; do not replace them with freehand generic arrows. The source comparison and reproducible extraction are in `docs/verification/shooter-reference-20261102/`.
 
+## Checkout and deployment provenance
+
+- After relocating a checkout, verify the active IDE project and its build/deployment logs use the canonical checkout before calling the migration complete. Retired reference copies must not retain a working build/deploy path. Preserve their source/history and verify a normal build stops with the canonical-location guidance. Verify installed APK hashes against the intended build artifact when investigating apparent regressions.
+
 ## Version control
 
 - This checkout is a colocated Git/Jujutsu repository. Use jj status/diff to review and jj describe/new to preserve completed changes; keep the local main bookmark current.

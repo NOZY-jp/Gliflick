@@ -6,7 +6,7 @@ Android向けのタイピング・サバイバルゲームです。日本語の�
 
 ## ビルド
 
-Android Studioでこのディレクトリを開き、Android SDK Platform 37をインストールしてGradleを同期してください。GradleのJVMは25を指定しています（`gradle/gradle-daemon-jvm.properties`）。SDKの場所はAndroid Studioで設定するか、Git管理外の`local.properties`に設定します。
+Android Studioでこのディレクトリを開き、Android SDK Platform 37をインストールしてGradleを同期してください。GradleのJVMはAdoptium/Temurin 25を指定しています（`gradle/gradle-daemon-jvm.properties`）。SDKの場所はAndroid Studioで設定するか、Git管理外の`local.properties`に設定します。
 
 Windows:
 
@@ -21,6 +21,12 @@ sh gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
 Debug APKは`app/build/outputs/apk/debug/app-debug.apk`に生成されます。Android Studioから端末・エミュレーターへ実行できます。
+
+### Android StudioとJDK
+
+GradleのJVM条件は`gradle/gradle-daemon-jvm.properties`でAdoptium 25に固定しています。既存JDKを自動検出できない場合は、ユーザーの`~/.gradle/gradle.properties`の`org.gradle.java.installations.paths`へJDKホームを登録してください。端末固有の絶対パスはリポジトリへコミットしません。[Gradle JVM条件の仕様](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria)。
+
+ネットワークドライブでは、フォルダーが存在してもJDKによる書込可否の判定差でGradleが拒否することがあります。この環境ではStudio同梱JBR 25の`File.canWrite()`がfalse、Temurin 25ではtrueとなり、Temurin指定でIDE同期とビルドが成功しました。旧作業コピーからのビルドで回避せず、現在のチェックアウトを同じJDKで開いてください。
 
 ## 操作
 
