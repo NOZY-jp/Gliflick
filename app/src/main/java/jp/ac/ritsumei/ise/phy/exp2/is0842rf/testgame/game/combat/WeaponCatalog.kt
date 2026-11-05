@@ -6,16 +6,16 @@ enum class DamageType { KINETIC, HEAT, ELECTRIC, EXPLOSIVE, CHEMICAL, COLD }
 
 enum class WeaponId(val title: String, val tags: String, val description: String) {
     REPEATER("リピーター", "キネティック / メイン", "標的へ短いバーストで弾丸を放つ。"),
-    SPECTRE("スペクター", "キネティック / ドローン", "語を打ち終えると、標準ローマ字に含まれる ${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.SPECTRE)} の数だけ近接ドローンを召喚。"),
+    SPECTRE("スペクター", "キネティック / ドローン", "語を打ち終えると、${WeaponTriggerGlyphs.ROMAN_REFERENCE}に含まれる ${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.SPECTRE)} の数だけ近接ドローンを召喚。"),
     SENTRY("セントリー", "熱 / タレット", "射程内の敵を自動で狙う常設タレット。"),
-    TESLA_MINE("テスラマイン", "電気 / タレット / D.O.T.", "${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.TESLA)} で始まる語で電撃タレットを設置。"),
+    TESLA_MINE("テスラマイン", "電気 / タレット / D.O.T.", "${WeaponTriggerGlyphs.startingCondition(WeaponTriggerGlyphs.TESLA)}を完成すると電撃タレットを設置。"),
     OSCILLATOR("オシレーター", "熱 / リモート", "最後の標的の方向へ、揺れる粒子の流れを放つ。"),
     METEOR("メテオ", "爆発 / リモート", "定期的に照準マーカーを展開。マーカーの語を打つと爆撃。"),
-    HUNTER("ハンター", "電気 / ドローン / D.O.T.", "語を打ち終えると、標準ローマ字に含まれる ${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.HUNTER)} の数だけ電撃ドローンを召喚。"),
+    HUNTER("ハンター", "電気 / ドローン / D.O.T.", "語を打ち終えると、${WeaponTriggerGlyphs.ROMAN_REFERENCE}に含まれる ${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.HUNTER)} の数だけ電撃ドローンを召喚。"),
     CHOPPER("チョッパー", "キネティック / リモート", "メイン武器の発射時、刃の空き枠があれば回転刃を放つ。文字条件なし。通常1枠で、画面外へ抜けると再使用可能。"),
-    MINEFIELD("マインフィールド", "爆発 / ドローン", "${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.MINEFIELD)} で始まる語で接触爆発する地雷を展開。"),
-    BLADE_TRAP("ブレードトラップ", "キネティック / タレット", "${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.BLADE)} で始まる語で四枚刃の回転トラップを設置。"),
-    ORBITER("オービター", "ケミカル / リモート", "${WeaponTriggerGlyphs.label(WeaponTriggerGlyphs.ORBITER)} で始まる語で、自機を周回するオーブを展開。"),
+    MINEFIELD("マインフィールド", "爆発 / ドローン", "${WeaponTriggerGlyphs.startingCondition(WeaponTriggerGlyphs.MINEFIELD)}を完成すると接触爆発する地雷を展開。"),
+    BLADE_TRAP("ブレードトラップ", "キネティック / タレット", "${WeaponTriggerGlyphs.startingCondition(WeaponTriggerGlyphs.BLADE)}を完成すると四枚刃の回転トラップを設置。"),
+    ORBITER("オービター", "ケミカル / リモート", "${WeaponTriggerGlyphs.startingCondition(WeaponTriggerGlyphs.ORBITER)}を完成すると、自機を周回するオーブを展開。"),
     GUARDIAN("ガーディアン", "熱 / ドローン", "火球を回す護衛ドローンを常設。燃料の語を打って活動時間を補給。")
 }
 

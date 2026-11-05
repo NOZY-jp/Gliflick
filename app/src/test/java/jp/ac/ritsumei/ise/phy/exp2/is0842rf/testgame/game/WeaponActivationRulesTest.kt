@@ -55,6 +55,28 @@ class WeaponActivationRulesTest {
         assertFalse(WeaponTriggerGlyphs.startingGroups.any { group -> group.any { it in "lqvx" } })
     }
 
+    @Test fun romanAlternativesAndKanaCompletionUseTheSameReferenceSpellingForActivation() {
+        for ((reading, spellings, triggeredWeapon) in listOf(
+            Triple("じかん", listOf("jikann", "zikann", "じかん"), WeaponId.BLADE_TRAP),
+            Triple("ちず", listOf("chizu", "tizu", "ちず"), WeaponId.TESLA_MINE)
+        )) {
+            for (spelling in spellings) {
+                val w = world()
+                assertTrue(w.acquireWeapon(triggeredWeapon))
+                val session = CombatSession(listOf(WordDefinition("word", reading)), w, Random(3))
+                session.resize(400f, 500f)
+                w.spawnEnemy(Vec2(300f, 100f), EnemyDefinition(maxHp = 1000, speed = 0f))
+                session.update(0f)
+                val tokens = spelling.map {
+                    jp.ac.ritsumei.ise.phy.exp2.is0842rf.testgame.game.model.InputToken.Stroke(it.toString())
+                }
+                assertTrue("Completion failed: $spelling", session.onInput(tokens, composing = false))
+                assertEquals("Activation must use the reference spelling: $spelling", 1,
+                    w.weaponActors.count { it.source == triggeredWeapon })
+            }
+        }
+    }
+
     @Test fun hunterUsesTenDamageHalfSecondCadenceAndDemoActiveLifetime() {
         val w = world(); val state = weapon(w, WeaponId.HUNTER).state
         val enemy = w.spawnEnemy(Vec2(300f, 100f), EnemyDefinition(maxHp = 1000, speed = 0f))

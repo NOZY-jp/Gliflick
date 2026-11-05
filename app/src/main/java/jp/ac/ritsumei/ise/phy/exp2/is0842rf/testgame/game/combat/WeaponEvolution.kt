@@ -91,7 +91,7 @@ object EvolutionCatalog {
     }.map {
         val rank = state.rank(it)
         UpgradeOffer("evolve-${it.name}-${rank + 1}", state.id,
-            it.title + if (rank > 0) " II" else "", if (it in triggerBranches && nextLetters != null) "語頭${nextLetters.toList().joinToString("・")}でも発動"
+            it.title + if (rank > 0) " II" else "", if (it in triggerBranches && nextLetters != null) "${WeaponTriggerGlyphs.startingCondition(nextLetters)}でも発動"
             else if (rank == 0) it.first else it.second,
             UpgradeRarity.RARE, OfferKind.EVOLUTION, evolution = it)
     }
