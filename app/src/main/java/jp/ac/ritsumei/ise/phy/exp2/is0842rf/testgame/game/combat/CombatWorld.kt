@@ -37,7 +37,8 @@ class CombatWorld(
     private val random: Random = Random.Default,
     private val spawnPolicy: EnemySpawnPolicy = MixedEnemySpawnPolicy(populationLimit = config.maxEnemiesAlive),
     val mainWeapon: MainWeapon = Repeater(),
-    private val spawnDensity: EnemySpawnDensity = RandomEnemySpawnDensity()
+    private val spawnDensity: EnemySpawnDensity = (spawnPolicy as? EnemySpawnRate)
+        ?.let(::PoissonEnemySpawnDensity) ?: RandomEnemySpawnDensity()
 ) {
     val player = Player(config.playerMaxHp)
     init {
@@ -475,7 +476,7 @@ class CombatWorld(
         val livingCount = livingPopulation
         if (config.spawningEnabled && livingCount < config.maxEnemiesAlive &&
             arrivalCapacity(enemies, config.maxEnemiesAlive) > 0 &&
-            spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random)) {
+            spawnDensity.shouldSpawn(dt, elapsedSeconds, level, random, enemies)) {
             val definition = spawnPolicy.choose(elapsedSeconds, level, random, enemies)
             if ((definition.splitter?.partCount ?: 1) <= arrivalCapacity(enemies, config.maxEnemiesAlive))
                 spawnEnemy(spawnPosition(definition.radius * definition.size), definition)

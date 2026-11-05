@@ -22,7 +22,7 @@
 | Projectile | 弾1発の実行時状態。発射元、位置、速度、ダメージ、当たり判定などが候補。Repeater等の友軍弾に用いる。シューターミサイルはHPと入力語を持つEnemyとして分類する。 |
 | WarderBarrier | ウォーダーに紐づく回転バリア。敵本体とは別の所有者付き衝突エンティティ。所有者死亡時に消滅する。 |
 
-現在は`EnemyKind`（役割）、`EnemyVariant`（形態）、`EnemyShape`（外形）を分離。固定値は`EnemyDefinition`、個体の行動は`EnemyBehavior`、耐久値処理は`Durability`へ分ける。EnemyKindはDRONE / SHIELD_DRONE / SHOOTER / SHOOTER_MISSILE / WARDER / SPLITTER / SPLITTER_SHARDで、ティア・形状・突然変異を独立した定義値として選ぶ。各`Enemy`は数値の`size`を持ち、基準半径に掛けた有効半径を衝突と描画で共有する。Droneの中心円はTier1〜4で同寸、外周の円が増えるTier1〜3で全体の半径が広がり、Tier3以降は同じ外半径を保つ。文字と耐力バーは位置だけサイズに追従し、文字サイズとバー寸法は固定する。被弾円はヒット時の有効半径を基準に拡大する。武器は`MainWeapon`契約と個別の設定・発射方式へ分ける。`CombatSession`は共有入力判定の結果からクリティカル率とWord Rushを計算し、`WeaponRuntimeModifiers`として渡す。`WordRushDefinition`に出典が未公開の時間窓・倍率をまとめ、各武器が発射方式に応じて適用する。`EnemySpawnPolicy`は敵定義を選び、`EnemySpawnDensity`は確率的に一回一体の出現を決める。群れ数・出現間隔は持たない。今回確認した公開デモの適応値・Threat予算・特殊/エリート上限をEnemySpawnDifficultyへ分離。MixedEnemySpawnPolicyが種類とティアを抽選し、Droneはボス制約のない時間・レベル依存の独立したティア分布を使う。
+現在は`EnemyKind`（役割）、`EnemyVariant`（形態）、`EnemyShape`（外形）を分離。固定値は`EnemyDefinition`、個体の行動は`EnemyBehavior`、耐久値処理は`Durability`へ分ける。EnemyKindはDRONE / SHIELD_DRONE / SHOOTER / SHOOTER_MISSILE / WARDER / SPLITTER / SPLITTER_SHARDで、ティア・形状・突然変異を独立した定義値として選ぶ。各`Enemy`は数値の`size`を持ち、基準半径に掛けた有効半径を衝突と描画で共有する。Droneの中心円はTier1〜4で同寸、外周の円が増えるTier1〜3で全体の半径が広がり、Tier3以降は同じ外半径を保つ。文字と耐力バーは位置だけサイズに追従し、文字サイズとバー寸法は固定する。被弾円はヒット時の有効半径を基準に拡大する。武器は`MainWeapon`契約と個別の設定・発射方式へ分ける。`CombatSession`は共有入力判定の結果からクリティカル率とWord Rushを計算し、`WeaponRuntimeModifiers`として渡す。`WordRushDefinition`に出典が未公開の時間窓・倍率をまとめ、各武器が発射方式に応じて適用する。`EnemySpawnPolicy`は敵定義を選び、`EnemySpawnDensity`は確率的に一回一体の出現を決める。群れ数・出現間隔は持たない。公開デモの適応値・Threat予算はEnemySpawnDifficultyへ分離。特殊/エリート上限は適用しない。MixedEnemySpawnPolicyがユーザー指定の種別到着率と種内ティアを扱い、PoissonEnemySpawnDensityが空き枠に収まる合計率で抽選する。Droneはボス制約のない時間・レベル依存の独立したティア分布を使う。
 
 ## 敵の要件
 
@@ -72,7 +72,7 @@
 
 ## 参考にする公開仕様と取り込まない複雑性
 
-[Glyphica Wiki](https://alias.black/glyphica/wiki_english.html)はThreatとレベル依存の適応値、特殊/エリートの上限を説明する。以前は式を確認できなかったためThreatを未使用としていたが、2026-11-02に公式WebデモのSpawnerで式と抽選表を確認した。種類の抽選とクラス上限へ採用し、独自のランダム到着密度とDroneの時間・レベル依存ティア分布を維持する。数式・採用範囲・推定値は[EnemyKindsDesign.md](EnemyKindsDesign.md)に集約する。
+[Glyphica Wiki](https://alias.black/glyphica/wiki_english.html)はThreatとレベル依存の適応値、特殊/エリートの上限を説明する。以前は式を確認できなかったためThreatを未使用としていたが、2026-11-02に公式WebデモのSpawnerで式と抽選表を確認した。2026-11-05からは種内ティア比率とThreatへ利用し、種別到着率はユーザー指定を優先する。クラス上限は適用しない。通常種のランダム到着密度とDroneの時間・レベル依存ティア分布を維持する。数式・採用範囲・推定値は[EnemyKindsDesign.md](EnemyKindsDesign.md)に集約する。
 
 参考値として、公式Wikiの敵バリアント一覧には次の範囲が掲載されている。新しい敵の固定性能はこの公開表から採用した。
 

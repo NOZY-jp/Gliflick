@@ -116,18 +116,15 @@ class EnemyKindsTest {
         assertEquals(16,w.livingPopulation)
         w.damageEnemy(group.id,350); assertEquals(15,w.livingPopulation)
     }
-    @Test fun speciesAppearGraduallyUsingSourceWeightsAndRespectClassCaps() {
-        val policy=MixedEnemySpawnPolicy()
-        assertTrue(policy.distributionAt(120.0,1).all { it.kind==EnemyKind.DRONE })
-        assertTrue(policy.distributionAt(121.0,1).any { it.kind==EnemyKind.SHOOTER && it.weight<0.02 })
-        assertTrue(policy.distributionAt(180.0,1).any { it.kind==EnemyKind.SHOOTER })
-        assertTrue(policy.distributionAt(300.0,1).any { it.kind==EnemyKind.SHIELD_DRONE })
-        assertTrue(policy.distributionAt(480.0,1).any { it.kind==EnemyKind.SPLITTER })
-        assertTrue(policy.distributionAt(600.0,1).any { it.kind==EnemyKind.WARDER })
-        val w=world();spawn(w,EnemyKind.WARDER)
-        assertFalse(policy.distributionAt(600.0,1,w.enemies).any { it.kind==EnemyKind.WARDER })
-        repeat(15) { w.spawnEnemy(Vec2(50f,50f)) }
-        assertTrue(policy.distributionAt(600.0,1,w.enemies).isEmpty())
+    @Test fun populationCapacityExcludesOnlyCandidatesThatDoNotFit() {
+        val policy = MixedEnemySpawnPolicy()
+        val w = world()
+        repeat(13) { w.spawnEnemy(Vec2(50f, 50f)) }
+        val choices = policy.distributionAt(300.0, 1, w.enemies)
+        assertFalse(choices.any { it.kind == EnemyKind.SPLITTER })
+        assertTrue(choices.any { it.kind == EnemyKind.WARDER })
+        repeat(3) { w.spawnEnemy(Vec2(50f, 50f)) }
+        assertTrue(policy.distributionAt(300.0, 1, w.enemies).isEmpty())
     }
     @Test fun penetrationHitsDistinctFormationPartsWithoutRepeatingOnePartOnNextFrame() {
         val w=world();val group=w.spawnEnemy(Vec2(600f,200f),

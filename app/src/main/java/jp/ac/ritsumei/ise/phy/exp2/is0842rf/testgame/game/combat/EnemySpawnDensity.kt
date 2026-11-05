@@ -8,6 +8,27 @@ import kotlin.random.Random
 /** Decides whether one individual enemy appears during this simulation step. */
 fun interface EnemySpawnDensity {
     fun shouldSpawn(dt: Float, elapsedSeconds: Double, playerLevel: Int, random: Random): Boolean
+    fun shouldSpawn(dt: Float, elapsedSeconds: Double, playerLevel: Int, random: Random,
+                    living: List<Enemy>): Boolean = shouldSpawn(dt, elapsedSeconds, playerLevel, random)
+}
+
+/** Absolute arrival intensity, including population-dependent eligibility; never a countdown. */
+fun interface EnemySpawnRate {
+    fun ratePerSecondAt(elapsedSeconds: Double, playerLevel: Int, living: List<Enemy>): Double
+}
+
+/** A sum of eligible species rates drives one shared Poisson arrival decision per frame. */
+class PoissonEnemySpawnDensity(private val rates: EnemySpawnRate) : EnemySpawnDensity {
+    override fun shouldSpawn(dt: Float, elapsedSeconds: Double, playerLevel: Int, random: Random) =
+        shouldSpawn(dt, elapsedSeconds, playerLevel, random, emptyList())
+
+    override fun shouldSpawn(dt: Float, elapsedSeconds: Double, playerLevel: Int, random: Random,
+                             living: List<Enemy>): Boolean {
+        if (dt <= 0f) return false
+        val rate = rates.ratePerSecondAt(elapsedSeconds, playerLevel, living)
+        require(rate >= 0.0 && rate.isFinite())
+        return rate > 0.0 && random.nextDouble() < 1.0 - exp(-rate * dt)
+    }
 }
 
 data class SpawnDensityParameters(

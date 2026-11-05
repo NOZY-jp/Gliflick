@@ -7,10 +7,15 @@
   "canonical_apk_sha256": "99308ba95178215c099ca3490018f7159069eda7965022483dd1380a221f7691",
   "installed_before_equals_retired_ide_apk": true,
   "retired_build_guard_verified": true,
-  "physical_restore_verified": false,
+  "physical_restore_verified": true,
   "retired_settings_original_sha256": "b2462127af268eb58ccf615f2514766625a807e703e41596154329fa85cfaad7",
   "ide_opened_canonical": true,
   "ide_sync_verified": true,
   "canonical_build_verified": true,
-  "gradle_daemon_vendor": "Eclipse Adoptium"
+  "gradle_daemon_vendor": "Eclipse Adoptium",
+  "installed_after_sha256": "e63ead994ceff19f63d6de3bc4ca8ccee69b1337fcd1fc73e78bd3d4aff7b1ca",
+  "canonical_ide_apk_sha256": "e63ead994ceff19f63d6de3bc4ca8ccee69b1337fcd1fc73e78bd3d4aff7b1ca",
+  "installed_after_equals_canonical_ide_apk": true,
+  "installed_after_dex_matches_preserved_canonical_apk": true,
+  "restored_application_revision": "a6f4e4e900e888000e50d2a22a29a4547167f062"
 }
