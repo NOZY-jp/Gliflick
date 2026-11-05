@@ -356,25 +356,55 @@ class TeslaMineWeapon : BaseSecondary(WeaponId.TESLA_MINE) {
         }
     }
 }
-class OscillatorWeapon : BaseSecondary(WeaponId.OSCILLATOR) {
-    private var direction = Vec2(0f, -1f)
-    private var cooldown = 0f
+/** Dense emission history forms a travelling wave; the renderer and swept collision share its dots. */
+data class OscillatorMotion(
+    val particlesPerSecond: Float = 60f,
+    val speed: Float = 360f,
+    val amplitudeRadians: Float = 0.2f,
+    val phaseSpeed: Float = 6f,
+    val turnSpeed: Float = PI.toFloat(),
+    val particleRadius: Float = 1.5f
+) {
+    init {
+        require(listOf(particlesPerSecond, speed, amplitudeRadians, phaseSpeed, turnSpeed, particleRadius)
+            .all { it > 0f && it.isFinite() })
+    }
+}
+
+class OscillatorWeapon(private val motion: OscillatorMotion = OscillatorMotion()) : BaseSecondary(WeaponId.OSCILLATOR) {
+    private var heading = -PI.toFloat() / 2f
+    private var desiredHeading = heading
+    private var phase = 0f
+    private var cooldown = 1f / motion.particlesPerSecond
     override fun onWord(world: CombatWorld, event: CompletedCombatWord) {
-        direction = (event.position - world.player.position).normalized()
+        val delta = event.position - world.player.position
+        if (delta.length() > 0.001f) desiredHeading = atan2(delta.y, delta.x)
     }
     override fun update(world: CombatWorld, dt: Float) {
+        if (dt <= 0f) return
+        val previousHeading = heading
+        val turn = atan2(sin(desiredHeading - heading), cos(desiredHeading - heading))
+        heading += turn.coerceIn(-motion.turnSpeed * dt, motion.turnSpeed * dt)
+        val previousPhase = phase
+        phase = (phase + motion.phaseSpeed * dt) % (2f * PI.toFloat())
         cooldown -= dt
-        if (cooldown <= 0f) {
-            val angle = atan2(direction.y, direction.x) + sin(world.elapsedSeconds.toFloat() * 3f) * 0.3f * scale(WeaponStat.SPREAD)
+        val interval = 1f / (motion.particlesPerSecond * scale(WeaponStat.RATE) *
+            world.currentWeaponModifiers.rateOfFireMultiplier)
+        while (cooldown <= 0f) {
+            // Sample the wave at emission time, including when a simulation step spans several dots.
+            val sampleTime = (dt + cooldown).coerceIn(0f, dt)
+            val sampleHeading = previousHeading + turn.coerceIn(-motion.turnSpeed * sampleTime, motion.turnSpeed * sampleTime)
+            val angle = sampleHeading + sin(previousPhase + motion.phaseSpeed * sampleTime) *
+                motion.amplitudeRadians * scale(WeaponStat.SPREAD)
             repeat(if (state.has(TWIN_HEADED)) 2 else 1) { index ->
-                val heading = angle + index * PI.toFloat()
-                world.launch(Projectile(world.player.position, Vec2(cos(heading), sin(heading)) * 230f,
-                    ((10f + EvolutionEffects.extraDamage(state)) * scale(WeaponStat.DAMAGE)).roundToInt(), 2.2f,
+                val direction = angle + index * PI.toFloat()
+                world.launch(Projectile(world.player.position, Vec2(cos(direction), sin(direction)) * motion.speed,
+                    ((10f + EvolutionEffects.extraDamage(state)) * scale(WeaponStat.DAMAGE)).roundToInt(), motion.particleRadius,
                     criticalChance = (0.01f + state.bonus(WeaponStat.CRIT) + world.currentWeaponModifiers.criticalChanceBonus).coerceIn(0f, 1f),
                     criticalDamageMultiplier = 2f + state.bonus(WeaponStat.CRIT_MULTIPLIER), source = id,
                     damageType = EvolutionEffects.type(state, DamageType.HEAT), penetrates = state.has(STABILIZED_PLASMA)))
             }
-            cooldown += 0.16f / (scale(WeaponStat.RATE) * world.currentWeaponModifiers.rateOfFireMultiplier)
+            cooldown += interval
         }
     }
 }
@@ -500,7 +530,7 @@ class GuardianWeapon : BaseSecondary(WeaponId.GUARDIAN) {
 object SecondaryWeaponFactory {
     private val factories: Map<WeaponId, () -> SecondaryWeapon> = mapOf(
         WeaponId.SPECTRE to ::SpectreWeapon, WeaponId.SENTRY to ::SentryWeapon,
-        WeaponId.TESLA_MINE to ::TeslaMineWeapon, WeaponId.OSCILLATOR to ::OscillatorWeapon,
+        WeaponId.TESLA_MINE to ::TeslaMineWeapon, WeaponId.OSCILLATOR to { OscillatorWeapon() },
         WeaponId.METEOR to ::MeteorWeapon, WeaponId.HUNTER to ::HunterWeapon,
         WeaponId.CHOPPER to ::ChopperWeapon, WeaponId.MINEFIELD to ::MinefieldWeapon,
         WeaponId.BLADE_TRAP to ::BladeTrapWeapon, WeaponId.ORBITER to ::OrbiterWeapon,

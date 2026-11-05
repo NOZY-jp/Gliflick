@@ -286,7 +286,7 @@ class CombatRenderer(context: Context) {
 
     private fun drawHitGeometry(canvas: Canvas, feedback: HitFeedback) {
         if (feedback.ringStrokeWidth > 0.01f) {
-            paint.color = red
+            paint.color = muted
             paint.alpha = 230
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = feedback.ringStrokeWidth

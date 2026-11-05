@@ -27,7 +27,7 @@ tags: [project/glyphica-android, weapons, visuals]
 | Hunter / hunter | 前後に長い三角形の輪郭。先端から敵へ折れ線状の電撃 | HunterDrone.on_render / on_renderStart |
 | Sentry / sentry | 自機外周に取り付けられた小さな塗りつぶし三角形。弾は小さな輪と輪の残像 | SentryTurret / ProjSentry / ProjSentryTrail |
 | Tesla Mine / tesla_mine | 三角形の輪郭、薄い範囲円、敵へ伸びる電撃 | TeslaMine |
-| Oscillator / oscillator | 揺れる列を作る小さな円形粒子。Repeaterの長いトレイルは付けない | ProjOscillator |
+| Oscillator / oscillator | 小円が密に等間隔で伸び、距離に応じて振れる波。照準を有限角速度で変え、外側に残る発射履歴が鞭のようにしなる。Repeaterのトレイルは付けない | Oscillator / ProjOscillator |
 | Meteor / meteor | 短い径方向の4本線と4つの分割円弧の照準。斜め上から入る線と広がる爆発 | MeteorTarget / MeteorLines |
 | Chopper / chopper | 互いに反対を向く長い2枚刃、薄い回転残像。Blade Trapと別形状 | chopperModel / ChopperInstance |
 | Minefield / minefield | 固い小円を中心に3本の短いスポークが回り、薄い円で範囲を示す | MineDrone |
@@ -58,3 +58,5 @@ Spectreは近接型にも移動処理を適用し、ターゲット付近で停�
 ## 撃破進化後の形
 
 [進化設計](WeaponEvolutionDesign.md)に対応。公開デモの`HunterDrone.on_render`の強化機は二枚の離れた三角翼で、専用`weapon_actor_hunter_elite.svg`を使う。`SpectreDrone.on_render`の強化機は通常の倍幅の軌跡・中心点・外周円。`chopperSawbladeModel`は12歯で外半径1、歯の谷.75、内半径.2を持ち、`weapon_actor_chopper_saw.svg`へ再構成した。Storm Ringは公開デモのオーブ周囲と軌跡の電撃、Tetherは実線接続を描く。効果がないカード字形への置き換えは行わない。
+
+2026-11-05：オシレーターの密度・波形・追従回転とRepeater専用の灰色命中環は[OscillatorMotionDesign.md](OscillatorMotionDesign.md)を参照。

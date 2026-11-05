@@ -352,7 +352,8 @@ class HitFeedback(
     val damage: Int,
     var enemyRadius: Float,
     incomingAngle: Float,
-    random: Random
+    random: Random,
+    val showRing: Boolean = false
 ) {
     var age = 0f
         private set
@@ -362,8 +363,8 @@ class HitFeedback(
     val numberScale get() = 1f - 0.5f * numberProgress
     val numberBaseline get() = origin.y - enemyRadius - 12f - 18f * numberProgress
     val ringProgress get() = (age / RING_LIFETIME).coerceIn(0f, 1f)
-    val ringRadius get() = enemyRadius * (1f + 0.2f * ringProgress)
-    val ringStrokeWidth get() = enemyRadius * 0.3f * (1f - ringProgress)
+    val ringRadius get() = enemyRadius * 1.2f * (1f + 0.2f * ringProgress)
+    val ringStrokeWidth get() = if (showRing) enemyRadius * 1.2f * 0.3f * (1f - ringProgress) else 0f
     val isFinished get() = age >= DAMAGE_NUMBER_LIFETIME
 
     val fragments = List(FRAGMENT_COUNT) {

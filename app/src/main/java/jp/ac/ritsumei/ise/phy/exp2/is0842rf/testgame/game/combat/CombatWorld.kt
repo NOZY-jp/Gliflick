@@ -262,7 +262,7 @@ class CombatWorld(
     fun dealDamage(enemyId: Long, damage: Int, source: WeaponId, type: DamageType,
                    criticalChance: Float = 0f, criticalMultiplier: Float = 1.5f,
                    inflictStatus: Boolean = true, hitPosition: Vec2? = null, incomingAngle: Float? = null,
-                   hitPart: Int = 0) {
+                   hitPart: Int = 0, projectileImpact: Boolean = false) {
         mutableEnemies.firstOrNull { it.id == enemyId && it.isAlive }?.let {
             if (isProtected(it)) return
             val bleeding = it.statuses.any { status -> status.type == DamageType.KINETIC && status.partIndex == hitPart }
@@ -275,7 +275,8 @@ class CombatWorld(
             val applied = it.takeDamage(actual, hitPart)
             if (applied > 0) {
                 val angle = incomingAngle ?: atan2(it.position.y - player.position.y, it.position.x - player.position.x)
-                mutableHitFeedback += HitFeedback(hitPosition ?: it.position, applied, it.radius, angle, random)
+                mutableHitFeedback += HitFeedback(hitPosition ?: it.position, applied, it.radius, angle, random,
+                    showRing = projectileImpact && source == WeaponId.REPEATER)
                 damageSamples += DamageSample(elapsedSeconds, source, applied)
                 if (inflictStatus && it.isAlive) applyAttackStatuses(it, source, type, hitPart)
             }
@@ -424,7 +425,7 @@ class CombatWorld(
                     dealDamage(target.first.id, projectile.damage, projectile.source, projectile.damageType,
                         projectile.criticalChance, projectile.criticalDamageMultiplier,
                         hitPosition = hit.enemy.previousPosition + (hit.enemy.position - hit.enemy.previousPosition) * hit.fraction,
-                        incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x), hitPart = target.second)
+                        incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x), hitPart = target.second, projectileImpact = true)
                     if (projectile.hitEnemyIds.isEmpty()) projectile.damage = (projectile.damage * projectile.ricochetDamageMultiplier).roundToInt()
                     projectile.hitEnemyIds += target.first.id
                 }
@@ -446,7 +447,7 @@ class CombatWorld(
                 val incomingAngle = atan2(projectile.velocity.y, projectile.velocity.x)
                 dealDamage(hit.first.id, projectile.damage, projectile.source, projectile.damageType,
                     projectile.criticalChance, projectile.criticalDamageMultiplier,
-                    hitPosition = enemyPositionAtImpact, incomingAngle = incomingAngle, hitPart = collision!!.part)
+                    hitPosition = enemyPositionAtImpact, incomingAngle = incomingAngle, hitPart = collision!!.part, projectileImpact = true)
                 if (projectile.freezeChance > 0f && random.nextFloat() < projectile.freezeChance)
                     hit.first.frozenSeconds = 2f
                 if (projectile.explosionRadius > 0f) {
